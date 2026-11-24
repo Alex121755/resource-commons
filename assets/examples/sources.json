@@ -1,0 +1,169 @@
+{
+  "purpose": "Category photographs for synthetic example details only; not the real recorded item, model, quantity, location, specifications or availability. Never overwrite user item photos.",
+  "inspected": "All seven photograph subjects visually inspected with view_image (six original images, one official 960px variant).",
+  "records": [
+    {
+      "file": "CellphoneSupport.jpg",
+      "src": "assets/examples/CellphoneSupport.jpg",
+      "author": "NicolasVenturini",
+      "url": "https://commons.wikimedia.org/wiki/File:CellphoneSupport.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/04/CellphoneSupport.jpg",
+      "sha256": "07c726786e0a4f52469420e3df92ec1ca176734388f12ae7c68af99433bcd3ef",
+      "bytes": 72422,
+      "title": "File:CellphoneSupport.jpg",
+      "originalSha256": "bc2c9f63ca176d3509a86091fb911eab1b6f6213eca5664e9cd7a47e761abe82",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/CellphoneSupport.jpg/960px-CellphoneSupport.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Foldingchairs.jpg",
+      "src": "assets/examples/Foldingchairs.jpg",
+      "author": "Dan4th Nicholas from Cambridge, MA, USA",
+      "url": "https://commons.wikimedia.org/wiki/File:Foldingchairs.jpg",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Foldingchairs.jpg",
+      "sha256": "5a68d3523a1d9495911f948d9de9294c54d78809c8ef2b10a24ff633c7721d24",
+      "bytes": 260074,
+      "title": "File:Foldingchairs.jpg",
+      "originalSha256": "72e5afdd011efd8352cc7eb38c3f719b3f3f4ef773c9f64caa0fc43b8e4f1182",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Foldingchairs.jpg/960px-Foldingchairs.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Mini_tripod_and_phone_holder.jpg",
+      "src": "assets/examples/Mini_tripod_and_phone_holder.jpg",
+      "author": "ChimaBee",
+      "url": "https://commons.wikimedia.org/wiki/File:Mini_tripod_and_phone_holder.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Mini_tripod_and_phone_holder.jpg",
+      "sha256": "9f0e6ac1f209170aaccb624a14e090c3f002be0bb949931cedc6b5d1b1ad2e5e",
+      "bytes": 233789,
+      "title": "File:Mini tripod and phone holder.jpg",
+      "originalSha256": "18948c9bf448b6775b8767d4fb8ab1cec41f6e98cdedae4e1d4e789719d2c8cc",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Mini_tripod_and_phone_holder.jpg/960px-Mini_tripod_and_phone_holder.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Power_strip.jpg",
+      "src": "assets/examples/Power_strip.jpg",
+      "author": "User1779637",
+      "url": "https://commons.wikimedia.org/wiki/File:Power_strip.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/48/Power_strip.jpg",
+      "sha256": "be338ef0cd90fe8cb30af04205c2993364ecb6f4315b3312fcf70aebf1606d75",
+      "bytes": 126209,
+      "title": "File:Power strip.jpg",
+      "originalSha256": "1bd6106f4cce57355ea83c6a969211d5431600c4cc710ef6b2ee281c5e3d4cba",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/Power_strip.jpg/960px-Power_strip.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Foldable_table_easel_in_Tuntorp_1.jpg",
+      "src": "assets/examples/Foldable_table_easel_in_Tuntorp_1.jpg",
+      "author": "W.carter",
+      "url": "https://commons.wikimedia.org/wiki/File:Foldable_table_easel_in_Tuntorp_1.jpg",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/e/ef/Foldable_table_easel_in_Tuntorp_1.jpg",
+      "sha256": "c12b6f225d87b42cf954c0732105a0131f7d8c1ccf342080db0b49c894d524d3",
+      "bytes": 209184,
+      "title": "File:Foldable table easel in Tuntorp 1.jpg",
+      "originalSha256": "8217328f7ff0ba26749d20857977db66fd6f65d4d83944aa8021b052a59158c9",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ef/Foldable_table_easel_in_Tuntorp_1.jpg/960px-Foldable_table_easel_in_Tuntorp_1.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Whiteboard_with_markers.jpg",
+      "src": "assets/examples/Whiteboard_with_markers.jpg",
+      "author": "Sprinno",
+      "url": "https://commons.wikimedia.org/wiki/File:Whiteboard_with_markers.jpg",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f6/Whiteboard_with_markers.jpg",
+      "sha256": "b64655b10b4f5b67a67e9845392940628ff3af62b095fd8d67d2c1fb66f412b0",
+      "bytes": 48882,
+      "title": "File:Whiteboard with markers.jpg",
+      "originalSha256": "207257e74ef33ab774c1348b08cd4d4227c16c3cca8b1a893dbb85207e0a6571",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f6/Whiteboard_with_markers.jpg/960px-Whiteboard_with_markers.jpg",
+      "modifications": "None locally; official Wikimedia size variant"
+    },
+    {
+      "file": "Caja_de_Herramientas.jpg",
+      "src": "assets/examples/Caja_de_Herramientas.jpg",
+      "author": "Jorge Barrios",
+      "url": "https://commons.wikimedia.org/wiki/File:Caja_de_Herramientas.jpg",
+      "license": "Public domain",
+      "licenseUrl": "https://commons.wikimedia.org/wiki/File:Caja_de_Herramientas.jpg#Licensing",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Caja_de_Herramientas.jpg",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Caja_de_Herramientas.jpg/960px-Caja_de_Herramientas.jpg",
+      "sha256": "f93721d90ebc16dd766f93c0f63718029fee510e7c06e2b504eba6a9f61119f6",
+      "bytes": 245448,
+      "title": "File:Caja de Herramientas.jpg",
+      "modifications": "None locally; official Wikimedia size variant",
+      "inspection": "Official 960px variant inspected visually with view_image; red toolboxes and arranged hand tools visible."
+    }
+  ],
+  "categoryMapping": {
+    "support": {
+      "src": "assets/examples/CellphoneSupport.jpg",
+      "author": "NicolasVenturini",
+      "url": "https://commons.wikimedia.org/wiki/File:CellphoneSupport.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "tripod": {
+      "src": "assets/examples/Mini_tripod_and_phone_holder.jpg",
+      "author": "ChimaBee",
+      "url": "https://commons.wikimedia.org/wiki/File:Mini_tripod_and_phone_holder.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "clamp": {
+      "src": "assets/examples/Mini_tripod_and_phone_holder.jpg",
+      "author": "ChimaBee",
+      "url": "https://commons.wikimedia.org/wiki/File:Mini_tripod_and_phone_holder.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "board": {
+      "src": "assets/examples/Whiteboard_with_markers.jpg",
+      "author": "Sprinno",
+      "url": "https://commons.wikimedia.org/wiki/File:Whiteboard_with_markers.jpg",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    "easel": {
+      "src": "assets/examples/Foldable_table_easel_in_Tuntorp_1.jpg",
+      "author": "W.carter",
+      "url": "https://commons.wikimedia.org/wiki/File:Foldable_table_easel_in_Tuntorp_1.jpg",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
+    },
+    "chair": {
+      "src": "assets/examples/Foldingchairs.jpg",
+      "author": "Dan4th Nicholas from Cambridge, MA, USA",
+      "url": "https://commons.wikimedia.org/wiki/File:Foldingchairs.jpg",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0"
+    },
+    "cable": {
+      "src": "assets/examples/Power_strip.jpg",
+      "author": "User1779637",
+      "url": "https://commons.wikimedia.org/wiki/File:Power_strip.jpg",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    "tools": {
+      "src": "assets/examples/Caja_de_Herramientas.jpg",
+      "author": "Jorge Barrios",
+      "url": "https://commons.wikimedia.org/wiki/File:Caja_de_Herramientas.jpg",
+      "license": "Public domain",
+      "licenseUrl": "https://commons.wikimedia.org/wiki/File:Caja_de_Herramientas.jpg#Licensing"
+    }
+  }
+}
