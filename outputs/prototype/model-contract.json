@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "scope": "Optional local-only extraction suggestions. Human adoption is required. No authorization decisions.",
+  "health": {"method": "GET", "path": "/api/health", "response": {"modelAvailable": "boolean", "model": "string"}},
+  "requestExtraction": {
+    "method": "POST", "path": "/api/extract-request",
+    "body": {"text": "string"},
+    "response": {"model": "string", "elapsedSeconds": "number", "data": {"purpose": "string", "needs": [{"id": "phone|display|chair|unsupported", "label": "string", "quantity": "integer|null", "phoneWidthMm": "number|null", "phoneWeightG": "number|null"}], "startLocal": "YYYY-MM-DDTHH:mm|null", "endLocal": "YYYY-MM-DDTHH:mm|null", "allowAlternatives": "boolean|null", "missingQuestions": ["string"], "evidence": [{"field": "string", "quote": "string"}]}}
+  },
+  "itemExtraction": {
+    "method": "POST", "path": "/api/extract-item",
+    "body": {"image": "complete base64 data URL", "text": "optional string"},
+    "response": {"model": "string", "elapsedSeconds": "number", "data": {"name": "string|null", "category": "support|tripod|clamp|board|easel|chair|cable|unknown", "visibleQuantity": "integer|null", "visibleText": "string", "specSuggestions": [{"field": "string", "value": "string"}], "uncertainties": ["string"]}}
+  },
+  "sceneExtraction": {
+    "method": "POST", "path": "/api/extract-scene",
+    "body": {"image": "complete compressed JPEG data URL, client limit 1200000 characters"},
+    "response": {"model": "string", "elapsedSeconds": "number", "localOnly": "boolean", "requiresHumanConfirmation": "boolean", "data": {"items": [{"id": "string", "name": "string|null", "category": "electronics|tools|stationery|furniture|containers|other|unknown", "bbox": "[x1,y1,x2,y2] in 0..1000 normalized coordinates, or null", "visibleQuantity": "integer|null", "visibleText": "string", "uncertainties": ["string"]}], "sceneNotes": ["string"]}},
+    "itemLimit": 12,
+    "clientBehavior": "Automatic analysis after upload; manual selected-draft save only. Invalid boxes use the entire image. Draft store is isolated from inventory and authorization."
+  },
+  "constraints": ["Missing facts must remain null", "Model output must never set approval or reservations", "Demo inventory and preset scenes remain isSynthetic=true; user-uploaded image scenes and drafts use isSynthetic=null because local model invocation does not establish image provenance", "No automatic save", "Unsupported requirement types must not silently count as fulfilled"]
+}

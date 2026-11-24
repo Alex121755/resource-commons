@@ -1,0 +1,198 @@
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.PhotoDraftData = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+  const STORAGE_KEY = 'resource-commons-photo-drafts-v1';
+  const MAX_STORE_BYTES = 3800000;
+  const categories = { electronics: '电子设备', tools: '工具', stationery: '文具', furniture: '家具', containers: '容器与收纳', other: '其他物品', unknown: '待分类' };
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const plain = (value, limit, fallback = '') => typeof value === 'string' ? value.slice(0, limit) : fallback;
+  const identifier = prefix => prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  function bbox(value) {
+    if (!Array.isArray(value) || value.length !== 4 || !value.every(n => Number.isFinite(n) && n >= 0 && n <= 1000)) return null;
+    return value[2] > value[0] && value[3] > value[1] ? [...value] : null;
+  }
+  function image(value, limit = 1800000) {
+    return typeof value === 'string' && value.length <= limit && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
+  }
+  function normalizeServiceHealth(value) {
+    const cloud = value?.backend === 'openai' && value.localOnly === false && value.remoteProcessing === true;
+    const local = ['local', 'ollama'].includes(value?.backend) && value.localOnly === true && value.remoteProcessing === false;
+    const known = value?.service === 'waicy-resource-commons' && (cloud || local);
+    return { known, ready: known && value.modelAvailable === true, backend: known ? value.backend : null,
+      provider: known ? (cloud ? 'OpenAI' : 'Ollama') : '', model: plain(value?.model, 120),
+      localOnly: known ? local : null, remoteProcessing: known ? cloud : null };
+  }
+  function processingNotice(service, kind = 'scene') {
+    if (!service?.known) return 'AI 服务状态尚未确认。请先连接启动服务；此时不会发送照片或需求文字，预置示例仍可查看。';
+    if (service.backend === 'openai') {
+      const sent = kind === 'request' ? '需求文字' : kind === 'item' ? '照片与填写的文字线索' : '压缩照片及需要时的局部裁切';
+      return `云端 AI · ${service.model || 'OpenAI'}：点击识别后，${sent}会通过本机后端发送至 OpenAI，可能产生 API 费用。${service.ready ? '密钥已配置；连通性、额度与余额以实际请求为准。' : '密钥尚未配置，暂不能识别。'}记录仍保存在当前浏览器，这不是云端共享库存。`;
+    }
+    return `本地 AI · ${service.model || 'Ollama'}：${service.ready ? '图片和文字交给本机模型处理。' : '模型尚未就绪，暂不能识别。'}记录保存在当前浏览器；结果需要人工核对。`;
+  }
+  function responseProvenance(response) {
+    const backend = ['openai', 'local', 'ollama'].includes(response?.backend) ? response.backend : null;
+    const localOnly = typeof response?.localOnly === 'boolean' ? response.localOnly : null;
+    const remoteProcessing = typeof response?.remoteProcessing === 'boolean' ? response.remoteProcessing : null;
+    // Any explicit remote signal wins over a contradictory local label.
+    const source = backend === 'openai' || localOnly === false || remoteProcessing === true ? 'cloud-ai' : ['local', 'ollama'].includes(backend) && localOnly === true && remoteProcessing === false ? 'local-ai' : null;
+    return { source, backend, provider: plain(response?.provider, 100), localOnly, remoteProcessing };
+  }
+  function normalizeResponse(response) {
+    if (!response || !response.data || !Array.isArray(response.data.items)) throw new Error('识别结果缺少物品列表，请重新尝试。');
+    const items = response.data.items.slice(0, 12).map((raw, index) => {
+      if (!raw || typeof raw !== 'object') throw new Error('识别结果中有无效物品。');
+      const box = bbox(raw.bbox);
+      const uncertainties = (Array.isArray(raw.uncertainties) ? raw.uncertainties : []).slice(0, 12).map(s => plain(s, 300)).filter(Boolean);
+      if (!box) { uncertainties.unshift('物品边界尚不可靠，默认保留整张照片。'); uncertainties.splice(12); }
+      return { id: 'candidate-' + index, sourceId: plain(raw.id, 100) || 'unidentified-' + index, name: plain(raw.name, 100, '待命名物品') || '待命名物品', category: Object.hasOwn(categories, raw.category) ? raw.category : 'unknown', bbox: box, visibleQuantity: Number.isInteger(raw.visibleQuantity) && raw.visibleQuantity > 0 && raw.visibleQuantity <= 99 ? raw.visibleQuantity : null, visibleText: plain(raw.visibleText, 1000), sourceText: plain(raw.sourceText, 1000), uncertainties, cropMode: box ? 'bbox' : 'original', selected: true };
+    });
+    const sourceCounts = new Map();
+    for (const i of items) sourceCounts.set(i.sourceId, (sourceCounts.get(i.sourceId) || 0) + 1);
+    const occupied = new Set(items.map(i => i.sourceId));
+    for (const [index, i] of items.entries()) if (sourceCounts.get(i.sourceId) > 1) {
+      i.uncertainties.unshift('模型候选来源编号重复；已分配独立编号，保留全部候选。'); i.uncertainties.splice(12);
+      let unique = 'unidentified-' + index;
+      while (occupied.has(unique)) unique += '-x';
+      occupied.add(unique); i.sourceId = unique;
+    }
+    const notes = (Array.isArray(response.data.sceneNotes) ? response.data.sceneNotes : []).slice(0, 12).map(s => plain(s, 500)).filter(Boolean);
+    if (response.data.items.length > 12) { notes.splice(11); notes.push('本次仅展示前 12 项；其余物品可另拍一张补充。'); }
+    const grouping = normalizeGrouping(response.grouping, items, notes);
+    return { items, grouping, sceneNotes: notes, model: plain(response.model, 120, 'AI 模型'), elapsedSeconds: Number.isFinite(response.elapsedSeconds) ? response.elapsedSeconds : null, ...responseProvenance(response) };
+  }
+  function normalizeGrouping(raw, items, notes) {
+    if (raw === undefined) return { version: 1, proposals: [] };
+    const invalid = () => { notes.splice(11); notes.push('部件分组建议有无效或冲突关系，已保留全部独立候选。'); return { version: 1, proposals: [] }; };
+    const known = new Map(items.map(i => [i.sourceId, i.id]));
+    if (!raw || raw.version !== 1 || !Array.isArray(raw.proposals) || raw.proposals.length > 12 || Object.keys(raw).some(k => !['version', 'proposals'].includes(k)) || known.size !== items.length) return invalid();
+    const parents = new Set(), childParent = new Map(), proposals = [];
+    for (const p of raw.proposals) {
+      if (!p || Object.keys(p).some(k => !['parentId', 'childIds', 'relation', 'evidence', 'applyByDefault'].includes(k)) || !known.has(p.parentId) || parents.has(p.parentId) || !Array.isArray(p.childIds) || !p.childIds.length || p.childIds.length > 11 || new Set(p.childIds).size !== p.childIds.length || !['integrated-part', 'same-object'].includes(p.relation) || typeof p.evidence !== 'string' || !p.evidence.trim() || p.evidence.length > 500 || (p.applyByDefault !== undefined && typeof p.applyByDefault !== 'boolean')) return invalid();
+      parents.add(p.parentId);
+      for (const child of p.childIds) { if (!known.has(child) || child === p.parentId || childParent.has(child)) return invalid(); childParent.set(child, p.parentId); }
+      proposals.push({ parentId: known.get(p.parentId), childIds: p.childIds.map(id => known.get(id)), relation: p.relation, evidence: p.evidence, applied: p.applyByDefault === true });
+    }
+    for (const child of childParent.keys()) {
+      const visited = new Set([child]); let parent = childParent.get(child);
+      while (parent !== undefined) { if (visited.has(parent)) return invalid(); visited.add(parent); parent = childParent.get(parent); }
+    }
+    return { version: 1, proposals };
+  }
+  function activeChildren(result, parentId) { return result.grouping?.proposals.find(p => p.parentId === parentId && p.applied === true)?.childIds || []; }
+  function effectiveItems(result) {
+    const hidden = new Set((result.grouping?.proposals || []).filter(p => p.applied === true).flatMap(p => p.childIds));
+    return result.items.filter(i => !hidden.has(i.id));
+  }
+  function setGrouping(result, parentId, applied) {
+    const proposal = result.grouping?.proposals.find(p => p.parentId === parentId);
+    if (!proposal) throw new Error('找不到这项分组建议。');
+    proposal.applied = applied === true; return result;
+  }
+  function groupedComponents(result, parentId) {
+    const components = [];
+    const visit = id => {
+      const proposal = result.grouping?.proposals.find(p => p.parentId === id && p.applied === true);
+      for (const childId of proposal?.childIds || []) {
+        const child = result.items.find(i => i.id === childId);
+        if (child?.selected === true) {
+          components.push({ sourceId: child.sourceId, name: child.name, category: child.category, bbox: bbox(child.bbox), cropMode: child.cropMode === 'bbox' && bbox(child.bbox) ? 'bbox' : 'original', visibleQuantity: child.visibleQuantity, visibleText: child.visibleText, sourceText: child.sourceText, uncertainties: [...child.uncertainties], relation: proposal.relation, evidence: proposal.evidence });
+          visit(childId);
+        }
+      }
+    };
+    visit(parentId); return components;
+  }
+  function checkPublicPhoto(value) {
+    if (!value || typeof value.author !== 'string' || !value.author.trim() || value.author.length > 120 || !['pageUrl', 'licenseUrl'].every(key => typeof value[key] === 'string' && value[key].length <= 500 && /^https:\/\/[^\s<>"']+$/.test(value[key]))) throw new Error('公开照片示例缺少有效的作者或来源链接。');
+    return { author: value.author, pageUrl: value.pageUrl, licenseUrl: value.licenseUrl };
+  }
+  function createBatch({ result, originalImage, width, height, locationHint = '', source, thumbnails = {}, publicPhoto, at = new Date().toISOString() }) {
+    if (!image(originalImage)) throw new Error('整张照片过大或格式不正确，请重新选图。');
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 2000 || height > 2000) throw new Error('图片尺寸不正确。');
+    const chosen = effectiveItems(result).filter(i => i.selected === true);
+    if (!chosen.length) throw new Error('至少选择一个物品再保存。');
+    if (chosen.length > 12) throw new Error('每张照片最多保存 12 个物品。');
+    if (result.source && source && result.source !== source) throw new Error('识别来源与草稿来源不一致，未保存。');
+    source = result.source || source || 'local-ai';
+    if (!['local-ai', 'cloud-ai', 'preset-demo', 'public-photo-demo'].includes(source)) throw new Error('照片识别来源无效。');
+    const provenance = result.backend ? { backend: result.backend, provider: result.provider || (source === 'cloud-ai' ? 'OpenAI' : 'Ollama'), localOnly: result.localOnly, remoteProcessing: result.remoteProcessing } : {};
+    const scene = { id: identifier('scene'), originalImage, width, height, createdAt: at, model: result.model, source, ...provenance, ...(source === 'public-photo-demo' ? { publicPhoto: checkPublicPhoto(publicPhoto) } : {}), sceneNotes: result.sceneNotes, isSynthetic: source === 'preset-demo' ? true : null };
+    const drafts = chosen.map(i => ({ id: identifier('draft'), sceneId: scene.id, status: 'draft', sourceId: i.sourceId, ...(groupedComponents(result, i.id).length ? { components: groupedComponents(result, i.id) } : {}), name: plain(i.name, 100, '待命名物品') || '待命名物品', category: Object.hasOwn(categories, i.category) ? i.category : 'unknown', visibleQuantity: Number.isInteger(i.visibleQuantity) && i.visibleQuantity > 0 && i.visibleQuantity <= 99 ? i.visibleQuantity : null, bbox: bbox(i.bbox), cropMode: i.cropMode === 'bbox' && bbox(i.bbox) ? 'bbox' : 'original', thumbnail: image(thumbnails[i.id], 250000) ? thumbnails[i.id] : '', locationHint: plain(locationHint, 120), visibleText: plain(i.visibleText, 1000), sourceText: plain(i.sourceText, 1000), uncertainties: Array.isArray(i.uncertainties) ? i.uncertainties.slice(0, 12).map(s => plain(s, 300)) : [], createdAt: at, model: scene.model, isSynthetic: scene.isSynthetic, owner: null, condition: 'unknown', sharePermission: 'unknown', approval: 'not-requested', availability: 'unknown' }));
+    return { scene, drafts };
+  }
+  function emptyStore() { return { version: 1, kind: 'resource-commons-photo-drafts', scenes: [], drafts: [] }; }
+  function validateStore(raw) {
+    if (!raw || raw.version !== 1 || raw.kind !== 'resource-commons-photo-drafts' || !Array.isArray(raw.scenes) || !Array.isArray(raw.drafts) || raw.scenes.length > 10 || raw.drafts.length > 60) throw new Error('照片草稿包结构不正确或超过 60 条。');
+    const checkString = (v, max, field, allowEmpty = false) => { if (typeof v !== 'string' || v.length > max || (!allowEmpty && !v.trim())) throw new Error(field + '不正确。'); return v; };
+    const checkDate = v => { if (typeof v !== 'string' || v.length > 40 || !Number.isFinite(Date.parse(v))) throw new Error('照片记录时间无效。'); return v; };
+    const scenes = raw.scenes.map(s => {
+      if (!s || !image(s.originalImage) || !['local-ai', 'cloud-ai', 'preset-demo', 'public-photo-demo'].includes(s.source) || !Number.isInteger(s.width) || !Number.isInteger(s.height) || s.width < 1 || s.height < 1 || s.width > 2000 || s.height > 2000 || !Array.isArray(s.sceneNotes) || s.sceneNotes.length > 12) throw new Error('照片来源、尺寸或格式无效。');
+      let provenance = {};
+      if (s.backend !== undefined || s.provider !== undefined || s.localOnly !== undefined || s.remoteProcessing !== undefined) {
+        const cloud = s.source === 'cloud-ai', local = s.source === 'local-ai';
+        const expected = cloud ? s.backend === 'openai' : local && ['local', 'ollama'].includes(s.backend);
+        if (!expected || typeof s.provider !== 'string' || s.provider.length > 100 || s.localOnly !== local || s.remoteProcessing !== cloud) throw new Error('照片来源与处理服务标记不一致。');
+        provenance = { backend: s.backend, provider: s.provider, localOnly: s.localOnly, remoteProcessing: s.remoteProcessing };
+      }
+      return { id: checkString(s.id, 100, '照片编号'), originalImage: s.originalImage, width: s.width, height: s.height, createdAt: checkDate(s.createdAt), model: checkString(s.model, 120, '模型名称'), source: s.source, ...provenance, ...(s.source === 'public-photo-demo' ? { publicPhoto: checkPublicPhoto(s.publicPhoto) } : {}), sceneNotes: s.sceneNotes.map(n => checkString(n, 500, '场景说明', true)), isSynthetic: s.source === 'preset-demo' ? true : null };
+    });
+    if (new Set(scenes.map(s => s.id)).size !== scenes.length) throw new Error('照片编号重复。');
+    if (new Set(scenes.map(s => s.originalImage)).size !== scenes.length) throw new Error('同一张照片不能重复保存成多个批次。');
+    const componentKeys = ['sourceId', 'name', 'category', 'bbox', 'cropMode', 'visibleQuantity', 'visibleText', 'sourceText', 'uncertainties', 'relation', 'evidence'];
+    const checkComponents = list => {
+      if (!Array.isArray(list) || list.length > 11) throw new Error('部件候选列表无效。');
+      const components = list.map(c => {
+        if (!c || Object.keys(c).some(k => !componentKeys.includes(k)) || !Object.hasOwn(categories, c.category) || c.bbox !== null && !bbox(c.bbox) || c.cropMode !== undefined && !['bbox', 'original'].includes(c.cropMode) || c.cropMode === 'bbox' && !bbox(c.bbox) || c.visibleQuantity !== null && (!Number.isInteger(c.visibleQuantity) || c.visibleQuantity < 1 || c.visibleQuantity > 99) || !Array.isArray(c.uncertainties) || c.uncertainties.length > 12 || !['integrated-part', 'same-object'].includes(c.relation)) throw new Error('部件候选、边界、数量或关系无效。');
+        return { sourceId: checkString(c.sourceId, 100, '部件来源编号'), name: checkString(c.name, 100, '部件名称'), category: c.category, bbox: bbox(c.bbox), cropMode: c.cropMode === undefined ? (bbox(c.bbox) ? 'bbox' : 'original') : c.cropMode, visibleQuantity: c.visibleQuantity, visibleText: checkString(c.visibleText, 1000, '部件可见文字', true), sourceText: checkString(c.sourceText || '', 1000, '部件原文线索', true), uncertainties: c.uncertainties.map(u => checkString(u, 300, '部件待核实信息', true)), relation: c.relation, evidence: checkString(c.evidence, 500, '分组依据') };
+      });
+      if (new Set(components.map(c => c.sourceId)).size !== components.length) throw new Error('部件来源编号重复。');
+      return components;
+    };
+    const drafts = raw.drafts.map(d => {
+      const scene = scenes.find(s => s.id === d?.sceneId);
+      if (!d || !scene || !Object.hasOwn(categories, d.category) || !['draft', 'converted'].includes(d.status) || !['bbox', 'original'].includes(d.cropMode) || d.bbox !== null && !bbox(d.bbox) || d.cropMode === 'bbox' && !bbox(d.bbox) || d.visibleQuantity !== null && (!Number.isInteger(d.visibleQuantity) || d.visibleQuantity < 1 || d.visibleQuantity > 99) || !Array.isArray(d.uncertainties) || d.uncertainties.length > 12 || (d.thumbnail && !image(d.thumbnail, 250000))) throw new Error('草稿物品、数量或裁切框无效。');
+      // Imported drafts cannot carry authorization or availability into inventory.
+      if (d.owner !== null || d.condition !== 'unknown' || d.sharePermission !== 'unknown' || d.approval !== 'not-requested' || d.availability !== 'unknown') throw new Error('照片草稿不能包含已确认状态或共享批准。');
+      return { id: checkString(d.id, 100, '草稿编号'), sceneId: scene.id, status: d.status, ...(d.sourceId !== undefined ? { sourceId: checkString(d.sourceId, 100, '候选来源编号') } : {}), ...(d.components !== undefined ? { components: checkComponents(d.components) } : {}), name: checkString(d.name, 100, '物品名称'), category: d.category, visibleQuantity: d.visibleQuantity, bbox: bbox(d.bbox), cropMode: d.cropMode, thumbnail: d.thumbnail || '', locationHint: checkString(d.locationHint, 120, '地点提示', true), visibleText: checkString(d.visibleText, 1000, '可见文字', true), sourceText: checkString(d.sourceText || '', 1000, '原文线索', true), uncertainties: d.uncertainties.map(s => checkString(s, 300, '待核实信息', true)), createdAt: checkDate(d.createdAt), model: checkString(d.model, 120, '模型名称'), isSynthetic: scene.isSynthetic, owner: null, condition: 'unknown', sharePermission: 'unknown', approval: 'not-requested', availability: 'unknown', ...(d.status === 'converted' ? { convertedItemId: checkString(d.convertedItemId, 100, '库存编号') } : {}) };
+    });
+    if (new Set(drafts.map(d => d.id)).size !== drafts.length) throw new Error('草稿编号重复。');
+    const usedSources = new Set();
+    for (const d of drafts) for (const sourceId of [d.sourceId, ...(d.components || []).map(c => c.sourceId)].filter(Boolean)) {
+      const key = d.sceneId + ':' + sourceId;
+      if (usedSources.has(key)) throw new Error('同一照片的候选被重复记录或分组。');
+      usedSources.add(key);
+    }
+    return { version: 1, kind: 'resource-commons-photo-drafts', scenes, drafts };
+  }
+  function serialize(store) { const text = JSON.stringify(validateStore(store)); if (new TextEncoder().encode(text).length > MAX_STORE_BYTES) throw new Error('照片草稿已接近本地空间上限，请先导出并删除不再需要的草稿。'); return text; }
+  function parse(text) { if (typeof text !== 'string' || new TextEncoder().encode(text).length > MAX_STORE_BYTES) throw new Error('草稿包超过 3.8 MB，无法导入。'); return validateStore(JSON.parse(text)); }
+  function append(store, batch) {
+    if (store.scenes.some(s => s.originalImage === batch.scene.originalImage)) throw new Error('这张照片已有草稿，未重复保存。请回到照片草稿查看已有卡片。');
+    return validateStore({ ...clone(store), scenes: [...store.scenes, batch.scene], drafts: [...store.drafts, ...batch.drafts] });
+  }
+  function remove(store, id) { const next = clone(store); next.drafts = next.drafts.filter(d => d.id !== id); const used = new Set(next.drafts.map(d => d.sceneId)); next.scenes = next.scenes.filter(s => used.has(s.id)); return next; }
+  function splitComponents(store, id) {
+    const next = clone(validateStore(store)), parent = next.drafts.find(d => d.id === id);
+    if (!parent) throw new Error('找不到这条照片草稿。');
+    if (!parent.components?.length) return next;
+    const scene = next.scenes.find(s => s.id === parent.sceneId);
+    const components = parent.components;
+    delete parent.components;
+    for (const c of components) {
+      // A split creates photo drafts only, even when the parent was converted earlier.
+      const splitNote = plain('从分组拆回：' + c.evidence, 300).replace(/[\uD800-\uDBFF]$/, '');
+      next.drafts.push({ ...clone(parent), id: identifier('draft'), status: 'draft', sourceId: c.sourceId, name: c.name, category: c.category, bbox: c.bbox, cropMode: c.cropMode, thumbnail: '', visibleQuantity: c.visibleQuantity, visibleText: c.visibleText, sourceText: c.sourceText, uncertainties: [...c.uncertainties, splitNote].slice(0, 12), model: scene.model, owner: null, condition: 'unknown', sharePermission: 'unknown', approval: 'not-requested', availability: 'unknown' });
+      delete next.drafts[next.drafts.length - 1].convertedItemId;
+    }
+    return validateStore(next);
+  }
+  function searchDrafts(drafts, query = '') {
+    const text = String(query).trim().toLocaleLowerCase();
+    return drafts.filter(d => !text || [d.name, categories[d.category] || '', d.locationHint, d.visibleText, ...(d.components || []).flatMap(c => [c.name, categories[c.category] || '', c.visibleText])].join(' ').toLocaleLowerCase().includes(text));
+  }
+  return { STORAGE_KEY, MAX_STORE_BYTES, categories, clone, bbox, image, normalizeServiceHealth, processingNotice, responseProvenance, normalizeResponse, normalizeGrouping, effectiveItems, activeChildren, setGrouping, groupedComponents, createBatch, emptyStore, validateStore, serialize, parse, append, remove, splitComponents, searchDrafts };
+});

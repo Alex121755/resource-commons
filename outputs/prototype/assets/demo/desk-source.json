@@ -1,0 +1,52 @@
+{
+  "photoTitle": "Laptop, Notebooks and Pens on White Desk",
+  "author": "Alan Quirván",
+  "sourcePage": "https://www.pexels.com/photo/laptop-notebooks-and-pens-on-white-desk-14541073/",
+  "license": "Pexels License",
+  "licenseUrl": "https://www.pexels.com/license/",
+  "downloadUrl": "https://images.pexels.com/photos/14541073/pexels-photo-14541073.jpeg?cs=srgb&dl=pexels-quirva-14541073.jpg&fm=jpg&w=1400",
+  "sha256": "698ee124d6eb13779d40cbaf7e24b74fa6ad268bf01c2e47949ecbd2803ae79b",
+  "bytes": 102429,
+  "displayDimensions": [
+    1400,
+    934
+  ],
+  "use": "Local UI demonstration. Real published stock photo; manual preset candidates, not AI predictions or real shared inventory. Schematic thumbnails are generated locally and labelled.",
+  "inspection": "Downloaded source photo visually inspected; selected three actually visible objects. Other objects in photo intentionally not annotated.",
+  "annotationMethod": "Manual visual annotation, normalized coordinates from 0 to 1000. Not training or evaluation ground truth.",
+  "candidates": [
+    {
+      "id": "demo-laptop",
+      "name": "笔记本电脑",
+      "bbox": [
+        620,
+        0,
+        1000,
+        420
+      ],
+      "visibleQuantity": 1
+    },
+    {
+      "id": "demo-notebook",
+      "name": "紫色笔记本",
+      "bbox": [
+        420,
+        305,
+        580,
+        655
+      ],
+      "visibleQuantity": 1
+    },
+    {
+      "id": "demo-cup",
+      "name": "杯子",
+      "bbox": [
+        220,
+        165,
+        385,
+        365
+      ],
+      "visibleQuantity": 1
+    }
+  ]
+}

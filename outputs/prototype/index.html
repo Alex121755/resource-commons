@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="用照片记录已有物品，查找资源与核实共享方案。WAICY 学生项目本地原型。">
+  <meta name="theme-color" content="#245d48">
+  <title>物尽其用 · 物品与共享</title>
+  <link rel="stylesheet" href="styles.css?v=5a61983024">
+  <link rel="stylesheet" href="community.css?v=c0a44b2630">
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#inventory" aria-label="物尽其用首页"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M8 27C8 12 18 7 33 7c0 15-8 25-23 25"/><path d="m9 31 16-16"/></svg></span><span>物尽其用</span></a>
+      <nav aria-label="主要导航">
+        <a href="#inventory" data-nav="inventory"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span>我的物品</span><span id="inventory-count" class="nav-count" hidden></span></a>
+        <a href="#community" data-nav="community"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"/></svg></span><span>找物互助</span><span id="plan-count" class="nav-count" hidden></span></a>
+        <a href="#messages" data-nav="messages"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 4H4v13h5l3 4 3-4h5zM8 9h8M8 13h5"/></svg></span><span>消息</span></a>
+      </nav>
+      <div class="sidebar-bottom"><span class="demo-badge">本地原型</span><p>库存与审批为模拟<br>记录保存在此浏览器</p><button id="data-tools" class="text-button">数据与设置</button></div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <header class="topbar"><span id="breadcrumb">我的物品</span><div><span id="save-status">保存在此浏览器</span><button id="help-button" class="icon-button" aria-label="数据与设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></div></header>
+      <div class="persistent-notice"><span class="demo-label">模拟库存与审批</span><details class="service-disclosure"><summary><span id="service-summary">检查 AI 连接中，暂不上传</span></summary><div id="model-notice">新照片草稿待核实。AI 状态确认前不上传。</div></details></div>
+      <div id="view"></div>
+      <footer>照片记录与预测都需核实，借用须获负责人批准。</footer>
+    </main>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="import-input" accept="application/json,.json" hidden>
+  <script src="example-photos.js?v=075488bd6b"></script><script src="engine.js?v=10ec42cacb"></script><script src="scene-drafts.js?v=afe10b6f39"></script><script src="scene-ui.js?v=638de94aaa"></script><script src="community.js?v=97e9bedce5"></script><script src="community-ui.js?v=951bcff5e6"></script><script src="app.js?v=9a9a1374d9"></script>
+</body>
+</html>
