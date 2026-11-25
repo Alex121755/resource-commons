@@ -8,6 +8,7 @@
   <title>Resource Commons · Workspace</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="community.css">
+  <link rel="stylesheet" href="i18n.css">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -32,7 +33,7 @@
       <header class="topbar">
         <span class="crumb-trail"><span class="workspace-label">Workspace</span><span class="crumb-separator" aria-hidden="true">/</span><span id="breadcrumb">Inventory</span></span>
         <a class="mobile-brand" href="#inventory" aria-label="Resource Commons home">Resource Commons</a>
-        <div><span id="save-status">Saved in this browser</span><button id="help-button" class="icon-button" aria-label="Data and settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></div>
+        <div><div data-language-picker></div><span id="save-status">Saved in this browser</span><button id="help-button" class="icon-button" aria-label="Data and settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg></button></div>
       </header>
       <div class="persistent-notice"><span class="demo-label">Simulated inventory and approvals</span><details class="service-disclosure"><summary><span id="service-summary">Checking AI availability</span></summary><div id="model-notice">Check photo drafts before saving. Uploads are paused while the connection is checked.</div></details></div>
       <div id="view"></div>
@@ -42,6 +43,10 @@
   <dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
   <input type="file" id="import-input" accept="application/json,.json" hidden>
+  <script src="locales/shell.js"></script>
+  <script src="locales/inventory.js"></script>
+  <script src="locales/activities.js"></script>
+  <script src="i18n.js"></script>
   <script src="example-photos.js"></script>
   <script src="engine.js"></script>
   <script src="scene-drafts.js"></script>

@@ -8,6 +8,8 @@ Resource Commons is a WAICY student project for finding and sharing supplies tha
 
 The team has implemented Resource Commons for resource management in a teachers’ office. The case study illustrates how a teacher could record a spare whiteboard, list it for colleagues and arrange pickup. Actual office photographs are pending. The stock and demonstration photos in the workspace are credited teaching examples.
 
+Use the language menu on any page to switch between English, Simplified Chinese, Spanish and German. The selection is saved in your browser and applies across the workspace, private groups and case study.
+
 ## Try it
 
 1. Open **Inventory** to browse the sample collection, record an item or review a photo draft. Inventory and the simulated community, requests and messages are saved in the current browser.

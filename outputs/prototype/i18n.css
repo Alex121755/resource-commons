@@ -1,0 +1,47 @@
+.rc-language label {
+  display: inline-flex;
+  gap: .4rem;
+  align-items: center;
+  margin: 0;
+  font: 600 .875rem/1.2 system-ui, sans-serif;
+  color: inherit;
+  white-space: nowrap;
+}
+.rc-language select {
+  width: auto;
+  min-width: 0;
+  max-width: 10rem;
+  margin: 0;
+  padding: .35rem .45rem;
+  color: #172f28;
+  background: #fafcf7;
+  border: 1px solid #aab9aa;
+  border-radius: .5rem;
+  font: inherit;
+  cursor: pointer;
+}
+.rc-language select:focus-visible {
+  outline: 3px solid #6e9647;
+  outline-offset: 2px;
+}
+@media (max-width: 740px) {
+  .rc-language label > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+  }
+  .rc-language select { max-width: 7.3rem; }
+}
+@media (max-width: 500px) {
+  .persistent-notice {
+    flex-wrap: wrap;
+    row-gap: .3rem;
+  }
+  .persistent-notice .demo-label {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

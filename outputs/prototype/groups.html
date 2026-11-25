@@ -11,6 +11,7 @@
     <meta name="referrer" content="no-referrer" />
     <title>Private groups · Resource Commons</title>
     <link rel="stylesheet" href="groups.css" />
+    <link rel="stylesheet" href="i18n.css" />
   </head>
   <body>
     <header class="mast">
@@ -19,6 +20,7 @@
         <a href="index.html#inventory">Inventory</a
         ><a href="teachers-office.html">Teachers’ office</a
         ><a href="groups.html" aria-current="page">Groups</a>
+        <div data-language-picker></div>
       </nav>
     </header>
     <main>
@@ -63,7 +65,7 @@
       </section>
       <section id="workspace" hidden>
         <div class="profile-strip">
-          <span>Signed in as <strong id="display-name"></strong></span>
+          <span>Signed in as <strong id="display-name" translate="no"></strong></span>
           <div>
             <button id="copy-key" class="quiet">Save member key</button
             ><button id="sign-out" class="quiet">Sign out</button>
@@ -114,7 +116,7 @@
             <section id="group-view" hidden>
               <div class="panel group-head">
                 <span class="kicker">Member-only inventory</span>
-                <h2 id="group-name"></h2>
+                <h2 id="group-name" translate="no"></h2>
                 <p id="member-count"></p>
                 <div class="row">
                   <button id="refresh" class="quiet">Refresh listings</button
@@ -204,6 +206,10 @@
       </div>
       <p id="key-status" role="status"></p>
     </dialog>
+    <script src="locales/inventory.js" defer></script>
+    <script src="locales/groups-case.js" defer></script>
+    <script src="locales/shell.js" defer></script>
+    <script src="i18n.js" defer></script>
     <script src="engine.js" defer></script>
     <script src="groups.js" defer></script>
   </body>

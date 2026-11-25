@@ -2,6 +2,7 @@
 const service = "https://resource-commons-waicy.alexl202301.chatgpt.site";
 const $ = (id) => document.getElementById(id);
 const profileSlot = "rc-private-group-profile";
+const i18n = window.RCI18n;
 let profile,
   active,
   busy = false;
@@ -18,8 +19,10 @@ try {
   /* A profile can still be opened in this tab. */
 }
 
-function status(message, error = false) {
-  $("status").textContent = message;
+let statusSource = "";
+function status(message, error = false, ...values) {
+  statusSource = message;
+  i18n.bind($("status"), message, ...values);
   $("status").classList.toggle("error", error);
 }
 function make(tag, text) {
@@ -62,7 +65,7 @@ async function run(task) {
   status("Connecting…");
   try {
     await task();
-    if ($("status").textContent === "Connecting…") status("");
+    if (statusSource === "Connecting…") status("");
   } catch (error) {
     status(
       error instanceof TypeError || error.name === "TimeoutError"
@@ -105,7 +108,8 @@ function inventoryOptions() {
   select.replaceChildren(new Option("Enter an item manually", ""));
   try {
     const saved = JSON.parse(localStorage.getItem("resource-commons-demo-v1"));
-    const state = saved || window.ResourceEngine?.seed();
+    const demo = window.ResourceEngine?.seed();
+    const state = saved || demo;
     for (const item of state?.items || []) {
       if (
         typeof item.name !== "string" ||
@@ -116,6 +120,12 @@ function inventoryOptions() {
       const option = new Option(item.name, String(select.length));
       option.dataset.quantity = String(item.quantity);
       option.dataset.itemId = item.id;
+      const original = demo?.items.find(sample => sample.id === item.id);
+      if (original?.name === item.name && item.isSynthetic) {
+        i18n.bind(option, item.name);
+      } else {
+        option.translate = false;
+      }
       select.add(option);
     }
   } catch {
@@ -139,12 +149,9 @@ async function displayGroup(id) {
   $("empty").hidden = true;
   $("group-view").hidden = false;
   $("group-name").textContent = data.name;
-  $("member-count").textContent =
-    data.memberCount +
-    " " +
-    (data.memberCount === 1 ? "member" : "members") +
-    " · " +
-    (data.is_owner ? "You own this group" : "You are a member");
+  const count = data.memberCount === 1 ? "{0} member" : "{0} members";
+  const role = data.is_owner ? "You own this group" : "You are a member";
+  i18n.bind($("member-count"), count + " · " + role, data.memberCount);
   $("invite").hidden = !data.is_owner;
   $("exit-group").textContent = data.is_owner ? "Delete group" : "Leave group";
   $("listings").replaceChildren();
@@ -152,18 +159,20 @@ async function displayGroup(id) {
     $("listings").append(make("p", "No shared resources yet."));
   for (const item of data.resources) {
     const article = make("article");
-    article.append(
-      make("strong", item.title),
-      make(
-        "small",
-        "Quantity: " + item.quantity + " · Shared by " + item.author,
-      ),
-    );
-    if (item.note) article.append(make("p", item.note));
+    const title = make("strong", item.title);
+    title.translate = false;
+    const byline = make("small");
+    i18n.bind(byline, "Quantity: {0} · Shared by {1}", item.quantity, item.author);
+    article.append(title, byline);
+    if (item.note) {
+      const note = make("p", item.note);
+      note.translate = false;
+      article.append(note);
+    }
     if (item.mine) {
       const button = action("Remove listing", () =>
         run(async () => {
-          if (!confirm("Remove this listing from the group?")) return;
+          if (!confirm(i18n.t("Remove this listing from the group?"))) return;
           await api("/groups/" + id + "/resources/" + item.id, "DELETE");
           await displayGroup(id);
           status("Listing removed.");
@@ -187,6 +196,7 @@ async function loadGroups(selectId) {
     $("group-list").append(make("p", "You haven’t joined a group yet."));
   for (const group of groups) {
     const button = action(group.name, () => run(() => displayGroup(group.id)));
+    button.translate = false;
     button.dataset.id = group.id;
     $("group-list").append(button);
   }
@@ -246,9 +256,7 @@ $("key-dialog").addEventListener("close", () => {
 });
 $("sign-out").onclick = () => {
   if (
-    !confirm(
-      "Sign out of this tab? You will need your saved member key to return.",
-    )
+    !confirm(i18n.t("Sign out of this tab? You will need your saved member key to return."))
   )
     return;
   clearGroup();
@@ -324,7 +332,7 @@ $("share-form").onsubmit = (event) => {
     history.replaceState(null, "", location.pathname + location.search);
     form.reset();
     await displayGroup(id);
-    status("Shared with " + active.name + ".");
+    status("Shared with {0}.", false, active.name);
   });
 };
 $("refresh").onclick = () => run(() => loadGroups(active?.id));
@@ -332,11 +340,9 @@ $("exit-group").onclick = () =>
   run(async () => {
     const owned = active.is_owner;
     if (
-      !confirm(
-        owned
-          ? "Delete this group and all of its listings for every member?"
-          : "Leave this group and remove your listings?",
-      )
+      !confirm(i18n.t(owned
+        ? "Delete this group and all of its listings for every member?"
+        : "Leave this group and remove your listings?"))
     )
       return;
     await api("/groups/" + active.id + (owned ? "" : "/membership"), "DELETE");
