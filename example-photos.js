@@ -5,7 +5,7 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function figure(category) {
     const p = images[category]; if (!p) return '';
-    return `<figure class="example-photo"><a href="${esc(p.src)}" target="_blank" rel="noopener" aria-label="查看完整示例照片"><img src="${esc(p.src)}" alt="同类实物示例照片"></a><figcaption>同类实物示例 · 不代表记录中的型号、规格或数量<br><span class="photo-credit">${esc(p.author)} · <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">照片来源</a> · <a href="${esc(p.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.license)}</a></span></figcaption></figure>`;
+    return `<figure class="example-photo"><a href="${esc(p.src)}" target="_blank" rel="noopener" aria-label="View full example photo"><img src="${esc(p.src)}" alt="Example photo of a similar item"></a><figcaption>Similar item · Illustrative model, dimensions, and quantity<br><span class="photo-credit">${esc(p.author)} · <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Photo source</a> · <a href="${esc(p.licenseUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.license)}</a></span></figcaption></figure>`;
   }
   root.ExamplePhotos = { figure };
 })(window);

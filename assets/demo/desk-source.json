@@ -17,7 +17,7 @@
   "candidates": [
     {
       "id": "demo-laptop",
-      "name": "笔记本电脑",
+      "name": "Laptop",
       "bbox": [
         620,
         0,
@@ -28,7 +28,7 @@
     },
     {
       "id": "demo-notebook",
-      "name": "紫色笔记本",
+      "name": "Purple notebook",
       "bbox": [
         420,
         305,
@@ -39,7 +39,7 @@
     },
     {
       "id": "demo-cup",
-      "name": "杯子",
+      "name": "Cup",
       "bbox": [
         220,
         165,
