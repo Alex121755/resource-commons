@@ -139,11 +139,11 @@
   }
   function outcomeLabel(outcome) { return ({ verified: 'Specifications updated', found: 'Location confirmed', 'not-found': 'Not found here', approved: 'Approved and reserved in demo', denied: 'Declined in demo' })[outcome] || outcome; }
   function updateAINotices() {
-    if ($('#request-ai-summary')) $('#request-ai-summary').textContent = service.remoteProcessing ? 'Request text goes to OpenAI. Charges may apply. Review the suggested fields.' : service.known ? 'A local model will organize your text for review.' : 'AI offline. Your request text stays here.';
-    $('#service-summary').textContent = service.remoteProcessing ? 'Cloud recognition · Uploads when selected. Charges may apply.' : service.known ? 'Local recognition · ' + (service.ready ? 'Processed on this device' : 'Service unavailable') : 'Manual mode';
+    if ($('#request-ai-summary')) $('#request-ai-summary').textContent = service.remoteProcessing ? `Request text goes to ${service.provider}. Charges may apply. Review the suggested fields.` : service.known ? 'A local model will organize your text for review.' : 'AI offline. Your request text stays here.';
+    $('#service-summary').textContent = service.remoteProcessing ? (service.ready ? 'Cloud recognition · Confirm each upload. Charges may apply.' : 'Cloud recognition unavailable') : service.known ? 'Local recognition · ' + (service.ready ? 'Processed on this device' : 'Service unavailable') : 'Manual mode';
     $('#model-notice').innerHTML = '<strong>Simulated inventory and approvals.</strong> Review new photo drafts before adding them. ' + esc(D.processingNotice(service));
     for (const element of document.querySelectorAll('[data-ai-notice]')) element.textContent = D.processingNotice(service, element.dataset.aiNotice);
-    const provider = service.remoteProcessing ? 'OpenAI' : service.known ? 'local AI' : 'AI';
+    const provider = service.remoteProcessing ? service.provider : service.known ? 'local AI' : 'AI';
     for (const [id, action] of [['#ai-request-button', 'Organize text'], ['#ai-photo-button', 'Recognize photo']]) {
       const button = $(id);
       if (button) {
@@ -155,13 +155,11 @@
   }
   function refreshService() {
     if (healthRequest) return healthRequest;
-    if (!['http:', 'https:'].includes(location.protocol) || location.hostname?.endsWith('.github.io')) { service = D.normalizeServiceHealth(null); updateAINotices(); return Promise.resolve(service); }
-    service = D.normalizeServiceHealth(null); modelAvailable = false; updateAINotices();
+    if (!window.ResourceAI.available) { service = D.normalizeServiceHealth(null); updateAINotices(); return Promise.resolve(service); }
     healthRequest = (async () => {
       try {
-        const response = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
-        if (!response.ok) throw new Error('AI service is offline.');
-        service = D.normalizeServiceHealth(await response.json());
+        const reported = D.normalizeServiceHealth(await window.ResourceAI.health());
+        service = window.ResourceAI.hosted && !reported.remoteProcessing ? D.normalizeServiceHealth(null) : reported;
       } catch (error) { service = D.normalizeServiceHealth(null); }
       modelAvailable = service.ready; modelName = service.model; updateAINotices(); return service;
     })().finally(() => { healthRequest = null; });
@@ -169,17 +167,14 @@
   }
   async function callModel(endpoint, payload, button) {
     if (!modelAvailable || location.protocol === 'file:') {
-      toast('Recognition is unavailable. Start the local backend and refresh its status on the photo screen.');
+      toast('Recognition is unavailable. Check the connection in Photo capture and try again.');
       return null;
     }
     if (modelBusy) { toast( 'The previous request is still processing.'); return null; }
     const oldText = button.textContent, controller = new AbortController(), timer = setTimeout(() => controller.abort(), 180000);
-    modelBusy = true; button.disabled = true; button.textContent = service.remoteProcessing ? 'Processing with OpenAI…' : 'Local model running…';
+    modelBusy = true; button.disabled = true; button.textContent = service.remoteProcessing ? `Processing with ${service.provider}…` : 'Local model running…';
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
-      const result = await response.json();
-      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'The request failed. Try again later.');
-      return result;
+      return await window.ResourceAI.extract(endpoint, payload, service, controller.signal);
     } catch (error) { throw new Error(error.name === 'AbortError' ? 'The request timed out after three minutes. Cloud charges may apply if you retry.' : error.message); }
     finally { clearTimeout(timer); modelBusy = false; button.disabled = !service.ready; button.textContent = oldText; updateAINotices(); }
   }
@@ -348,7 +343,7 @@
     toast('Demo sourcing list exported.');
   }
   function dataDialog() {
-    openModal('Data and settings', `<div class="info-panel"><strong>Inventory and approvals here are simulated. Review photo drafts before adding an item to your inventory.</strong><br>${esc(D.processingNotice(service))}<br>Posts and messages on the demo board stay in this browser. Use Groups to share selected items with other members.</div><h3>Available in the planner</h3><p>Batch photo drafts, cropping, manual corrections, item records, AI request parsing, rule-based matching, quantity and connector checks, booking conflicts, and location history.</p><h3>Loan coordination</h3><p>Arrange actual approval, pickup, and return with the owner. Private group listings are available under Groups. AI features require a local backend. Cloud mode also needs a server-side key. Opening HTML directly supports the rule-based demo.</p><h3>Save and transfer</h3><p>This browser stores data in localStorage. Clearing site data or ending a private session can erase it. Photos stay in browser storage. Cloud recognition sends images to OpenAI. An inventory backup includes the request and up to 30 items. Export photo drafts from the Photo drafts section using its import and export controls.</p><div class="data-actions"><button class="button primary" data-action="export-data">Export JSON backup</button><button class="button" data-action="import-data">Import JSON</button></div><h3>Start over</h3><p>Resetting replaces the demo inventory. Export inventory and photo drafts separately to back them up.</p><div class="data-actions"><button class="button" data-action="restore">Restore sample inventory</button><button class="button danger" data-action="clear">Clear inventory and checks</button></div><p class="footnote">Version 1.3 · Photo drafts and demo inventory are stored separately.<br>See the project README for local hosting instructions.</p>`);
+    openModal('Data and settings', `<div class="info-panel"><strong>Inventory and approvals here are simulated. Review photo drafts before adding an item to your inventory.</strong><br>${esc(D.processingNotice(service))}<br>Posts and messages on the demo board stay in this browser. Use Groups to share selected items with other members.</div><h3>Available in the planner</h3><p>Batch photo drafts, cropping, manual corrections, item records, AI request parsing, rule-based matching, quantity and connector checks, booking conflicts, and location history.</p><h3>Loan coordination</h3><p>Arrange actual approval, pickup, and return with the owner. Private group listings are available under Groups. The public workspace offers cloud recognition. Running the Python backend lets you use a local model. Opening HTML directly supports the rule-based demo.</p><h3>Save and transfer</h3><p>This browser stores data in localStorage. Clearing site data or ending a private session can erase it. Photos stay in browser storage. Cloud recognition sends images to the provider named before upload. An inventory backup includes the request and up to 30 items. Export photo drafts from the Photo drafts section using its import and export controls.</p><div class="data-actions"><button class="button primary" data-action="export-data">Export JSON backup</button><button class="button" data-action="import-data">Import JSON</button></div><h3>Start over</h3><p>Resetting replaces the demo inventory. Export inventory and photo drafts separately to back them up.</p><div class="data-actions"><button class="button" data-action="restore">Restore sample inventory</button><button class="button danger" data-action="clear">Clear inventory and checks</button></div><p class="footnote">Version 1.3 · Photo drafts and demo inventory are stored separately.<br>See the project README for local hosting instructions.</p>`);
   }
   function confirmReset(clear) {
     openModal(clear ? 'Clear demo records?' : 'Restore sample inventory?', `<p>${clear ? 'All items and checks will be cleared. Your current request will be kept.' : 'The sample inventory will replace current items, requests, and checks.'} This action cannot be undone here.</p><div class="modal-footer"><button class="button" data-action="close-modal">Cancel</button><button id="confirm-reset" class="button danger">${clear ? 'Clear inventory' : 'Restore samples'}</button></div>`);

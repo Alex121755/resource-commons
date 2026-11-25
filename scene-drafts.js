@@ -17,30 +17,31 @@
   function image(value, limit = 1800000) {
     return typeof value === 'string' && value.length <= limit && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
   }
+  const cloudProviders = {openai: 'OpenAI', deepseek: 'DeepSeek'};
   function normalizeServiceHealth(value) {
-    const cloud = value?.backend === 'openai' && value.localOnly === false && value.remoteProcessing === true;
+    const cloud = Object.hasOwn(cloudProviders, value?.backend) && value.localOnly === false && value.remoteProcessing === true;
     const local = ['local', 'ollama'].includes(value?.backend) && value.localOnly === true && value.remoteProcessing === false;
     const known = value?.service === 'waicy-resource-commons' && (cloud || local);
     return { known, ready: known && value.modelAvailable === true, backend: known ? value.backend : null,
-      provider: known ? (cloud ? 'OpenAI' : 'Ollama') : '', model: plain(value?.model, 120),
+      provider: known ? (cloud ? cloudProviders[value.backend] : 'Ollama') : '', model: plain(value?.model, 120),
       localOnly: known ? local : null, remoteProcessing: known ? cloud : null };
   }
   function processingNotice(service, kind = 'scene') {
     if (!service?.known) return 'Recognition is offline. No photo or request text is sent. You can still open the sample photo.';
-    if (service.backend === 'openai') {
+    if (service.remoteProcessing) {
       const content = kind === 'request' ? 'your request text' : kind === 'item' ? 'your photo and text clues' : 'the compressed photo and any detail crops';
       const status = service.ready ? 'Key configured. A live request will check service access and quota.' : 'Configure a server-side key to enable recognition.';
-      return `Cloud AI · ${service.model || 'OpenAI'}. Starting recognition sends ${content} through your local backend to OpenAI. API charges may apply. ${status} Inventory records stay in this browser. Share selected items separately through Groups.`;
+      return `Cloud AI · ${service.model || service.provider}. Starting recognition sends ${content} through Resource Commons to ${service.provider}. API charges may apply. ${status} Inventory records stay in this browser. Share selected items separately through Groups.`;
     }
     const status = service.ready ? 'Images and text are processed by your local model.' : 'Start the model to enable recognition.';
     return `Local AI · ${service.model || 'Ollama'}. ${status} Records stay in this browser. Review the results before saving.`;
   }
   function responseProvenance(response) {
-    const backend = ['openai', 'local', 'ollama'].includes(response?.backend) ? response.backend : null;
+    const backend = ['openai', 'deepseek', 'local', 'ollama'].includes(response?.backend) ? response.backend : null;
     const localOnly = typeof response?.localOnly === 'boolean' ? response.localOnly : null;
     const remoteProcessing = typeof response?.remoteProcessing === 'boolean' ? response.remoteProcessing : null;
     // Any explicit remote signal wins over a contradictory local label.
-    const source = backend === 'openai' || localOnly === false || remoteProcessing === true ? 'cloud-ai' : ['local', 'ollama'].includes(backend) && localOnly === true && remoteProcessing === false ? 'local-ai' : null;
+    const source = Object.hasOwn(cloudProviders, backend) || localOnly === false || remoteProcessing === true ? 'cloud-ai' : ['local', 'ollama'].includes(backend) && localOnly === true && remoteProcessing === false ? 'local-ai' : null;
     return { source, backend, provider: plain(response?.provider, 100), localOnly, remoteProcessing };
   }
   function normalizeResponse(response) {
@@ -121,7 +122,7 @@
     if (result.source && source && result.source !== source) throw new Error('Recognition and draft sources differ. Changes were not saved.');
     source = result.source || source || 'local-ai';
     if (!['local-ai', 'cloud-ai', 'preset-demo', 'public-photo-demo'].includes(source)) throw new Error('Invalid recognition source.');
-    const provenance = result.backend ? { backend: result.backend, provider: result.provider || (source === 'cloud-ai' ? 'OpenAI' : 'Ollama'), localOnly: result.localOnly, remoteProcessing: result.remoteProcessing } : {};
+    const provenance = result.backend ? { backend: result.backend, provider: result.provider || (cloudProviders[result.backend] || 'Ollama'), localOnly: result.localOnly, remoteProcessing: result.remoteProcessing } : {};
     const scene = { id: identifier('scene'), originalImage, width, height, createdAt: at, model: result.model, source, ...provenance, ...(source === 'public-photo-demo' ? { publicPhoto: checkPublicPhoto(publicPhoto) } : {}), sceneNotes: result.sceneNotes, isSynthetic: source === 'preset-demo' ? true : null };
     const drafts = chosen.map(i => ({ id: identifier('draft'), sceneId: scene.id, status: 'draft', sourceId: i.sourceId, ...(groupedComponents(result, i.id).length ? { components: groupedComponents(result, i.id) } : {}), name: plain(i.name, 100, 'Unnamed item') || 'Unnamed item', category: Object.hasOwn(categories, i.category) ? i.category : 'unknown', visibleQuantity: Number.isInteger(i.visibleQuantity) && i.visibleQuantity > 0 && i.visibleQuantity <= 99 ? i.visibleQuantity : null, bbox: bbox(i.bbox), cropMode: i.cropMode === 'bbox' && bbox(i.bbox) ? 'bbox' : 'original', thumbnail: image(thumbnails[i.id], 250000) ? thumbnails[i.id] : '', locationHint: plain(locationHint, 120), visibleText: plain(i.visibleText, 1000), sourceText: plain(i.sourceText, 1000), uncertainties: Array.isArray(i.uncertainties) ? i.uncertainties.slice(0, 12).map(s => plain(s, 300)) : [], createdAt: at, model: scene.model, isSynthetic: scene.isSynthetic, owner: null, condition: 'unknown', sharePermission: 'unknown', approval: 'not-requested', availability: 'unknown' }));
     return { scene, drafts };
@@ -136,7 +137,7 @@
       let provenance = {};
       if (s.backend !== undefined || s.provider !== undefined || s.localOnly !== undefined || s.remoteProcessing !== undefined) {
         const cloud = s.source === 'cloud-ai', local = s.source === 'local-ai';
-        const expected = cloud ? s.backend === 'openai' : local && ['local', 'ollama'].includes(s.backend);
+        const expected = cloud ? Object.hasOwn(cloudProviders, s.backend) : local && ['local', 'ollama'].includes(s.backend);
         if (!expected || typeof s.provider !== 'string' || s.provider.length > 100 || s.localOnly !== local || s.remoteProcessing !== cloud) throw new Error('Photo source and processing service do not match.');
         provenance = { backend: s.backend, provider: s.provider, localOnly: s.localOnly, remoteProcessing: s.remoteProcessing };
       }
