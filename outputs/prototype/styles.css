@@ -368,3 +368,9 @@ main { margin-left: var(--rail-width); width: calc(100% - var(--rail-width)); pa
   .page-head > div, .community-page-head > div { min-width: 0; }
   .location-filter select { max-width: 100%; }
 }
+@media (min-width: 721px) and (max-width: 1000px) {
+  .plan-head { flex-wrap: wrap; align-items: flex-start; }
+  .plan-head > div:last-child { flex: 0 0 auto; }
+  .plan-head .strategy-options > summary { text-align: left; }
+  .plan-head .strategy-switch { left: 0; right: auto; }
+}
