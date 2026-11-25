@@ -14,6 +14,7 @@ function testDatabase() {
       "utf8",
     ),
   );
+  db.exec(readFileSync(new URL('./drizzle/0001_ai_calls.sql', import.meta.url), 'utf8'));
   return {
     prepare(sql) {
       const statement = db.prepare(sql);
@@ -124,4 +125,23 @@ test("group resources and invitations are scoped to membership", async () => {
   assert.equal((await call(member, group)).status, 404);
   assert.equal((await call(owner, group, "DELETE")).status, 200);
   assert.deepEqual((await (await call(owner, "/groups")).json()).groups, []);
+});
+
+test('public recognition requires consent and enforces its quota before contacting the provider', async () => {
+  const db = testDatabase();
+  const env = {DB:db, DEEPSEEK_API_KEY:randomBytes(32).toString('hex')};
+  const url = 'https://groups.example/api/extract-request';
+  const origin = 'https://alex121755.github.io';
+  const headers = {'Content-Type':'application/json',Origin:origin};
+  const health = await worker.fetch(new Request('https://groups.example/api/health'), env);
+  assert.equal((await health.json()).provider, 'DeepSeek');
+  const submit = (headers, data) => worker.fetch(new Request(url,{method:'POST',headers,body:JSON.stringify(data)}),env);
+  assert.equal((await submit(headers,{text:'I need two chairs.'})).status,403);
+  headers['X-Resource-Commons-Consent']='cloud-v1';
+  assert.equal((await submit({...headers,Origin:'https://another.example'},{text:'Two chairs'})).status,403);
+  assert.equal((await submit(headers,{text:''})).status,400);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM ai_calls').bind().first().n,0);
+  for(let i=0;i<100;i++) db.prepare('INSERT INTO ai_calls(day,started_at,client) VALUES(?,?,?)').bind('2020-01-01',0,'sample').run();
+  assert.equal((await submit(headers,{text:'I need two chairs.'})).status,429);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM ai_calls').bind().first().n,100);
 });

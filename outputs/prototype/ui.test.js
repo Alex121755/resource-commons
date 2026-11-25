@@ -38,10 +38,11 @@ function renderRequestForm(state, photoDraftUI, options = {}) {
   const context = {
     document: { querySelector: node, querySelectorAll: () => [], addEventListener(type, callback) { documentHandlers.set(type, callback); } },
     window: { ResourceEngine: E, PhotoDraftData: D, PhotoDraftUI: photoDraftUI, addEventListener() {}, scrollTo() {} },
-    location: { hash: options.hash || '#request', protocol: options.protocol || 'file:' },
+    location: { hash: options.hash || '#request', protocol: options.protocol || 'file:', hostname: options.hostname },
     localStorage: { getItem: () => JSON.stringify(state), setItem(key, value) { writes.push({ key, value }); } },
     setTimeout, clearTimeout, console, fetch: options.fetch, AbortSignal
   };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'ai-service.js'), 'utf8'), context);
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8'), context, { filename: 'app.js' });
   return nodes;
 }

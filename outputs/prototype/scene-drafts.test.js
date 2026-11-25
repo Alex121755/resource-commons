@@ -256,6 +256,22 @@ test('Photo, single-item and text workflows explain what is sent, potential cost
     assert.match(notice, /records stay in this browser/i); assert.match(notice, /Share selected items separately through Groups/);
   }
 });
+test('DeepSeek Flash photo drafts preserve their provider through save and import', () => {
+  const metadata = {backend:'deepseek', provider:'DeepSeek', model:'deepseek-flash', localOnly:false, remoteProcessing:true};
+  const status = D.normalizeServiceHealth(health(metadata));
+  assert.equal(status.ready, true);
+  assert.equal(status.provider, 'DeepSeek');
+  assert.match(D.processingNotice(status), /to DeepSeek/);
+  const result = groupedResponse(metadata);
+  const batch = D.createBatch({result, originalImage:photo, width:1200, height:800});
+  const store = D.append(D.emptyStore(), batch);
+  const imported = D.parse(D.serialize(store)).scenes[0];
+  assert.equal(imported.backend, 'deepseek');
+  assert.equal(imported.provider, 'DeepSeek');
+  assert.equal(imported.source, 'cloud-ai');
+  assert.equal(imported.model, 'deepseek-flash');
+});
+
 test('Cloud responses retain processing metadata and save independently of the calling local-ai default', () => {
   const result = groupedResponse({ ...cloudMetadata });
   assert.equal(result.source, 'cloud-ai'); assert.equal(result.backend, 'openai'); assert.equal(result.provider, 'OpenAI(Cloud)');

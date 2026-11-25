@@ -67,12 +67,12 @@
   function captureNotice() {
     if (!service.ready) return 'Manual entry and the sample photo are available. Automatic recognition needs a connected AI service.';
     return service.remoteProcessing
-      ? 'OpenAI processes the photo and may charge for the request. Drafts stay in this browser.'
+      ? `${service.provider} processes the photo and may charge for the request. Drafts stay in this browser.`
       : 'Photos are analyzed on this device. Drafts stay in this browser.';
   }
   function openCapture() {
     if (session?.result) { renderReview(); return; }
-    shell(`<div class="scene-body"><div class="scene-upload"><div class="scene-camera" aria-hidden="true">▣</div><h3>Add items from a photo</h3><p>Record an item yourself, or use photo recognition to create drafts for review.</p><button type="button" id="scene-select" class="button primary" ${service.ready ? '' : 'hidden disabled'}>Identify items in a photo <span aria-hidden="true">→</span></button><button type="button" id="scene-manual" class="button ${service.ready ? '' : 'primary'}" data-scene-action="add-manual">Add a photo manually</button><input id="scene-file" type="file" accept="image/jpeg,image/png,image/webp" hidden><p class="footnote">JPEG / PNG / WebP · Compressed in your browser</p><p id="scene-processing-summary" class="processing-summary" role="status">${esc(captureNotice())}</p><details class="processing-details"><summary>Recognition service</summary><p id="scene-service-notice">${esc(D.processingNotice(service))}</p><button type="button" class="text-button" data-scene-action="refresh-service">Check connection</button></details></div><div class="scene-start-footer"><span>You can add the owner and sharing terms after saving.</span><button class="text-button" data-scene-action="demo">Try a sample photo →</button></div><div id="scene-error" class="error" role="alert"></div><details class="details"><summary>How photo capture works</summary><div class="details-body"><p>The AI service suggests item names and boundaries. Review each crop, especially overlapping or partially hidden items.</p><p>This browser saves a compressed copy and item thumbnails. Cloud recognition sends the photo and any required detail crops to OpenAI for processing. Drafts enter the planner after you review them and add them to inventory.</p><p>To use recognition locally, run <code>python3 outputs/local_ai/server.py</code> from the repository root and open <a href="http://127.0.0.1:8765/prototype/">the local workspace</a>. The public sample uses hand-labeled items.</p><button class="text-button" data-scene-action="demo-illustration">Try the illustrated example</button></div></details></div>`);
+    shell(`<div class="scene-body"><div class="scene-upload"><div class="scene-camera" aria-hidden="true">▣</div><h3>Add items from a photo</h3><p>Record an item yourself, or use photo recognition to create drafts for review.</p><button type="button" id="scene-select" class="button primary" ${service.ready ? '' : 'hidden disabled'}>Identify items in a photo <span aria-hidden="true">→</span></button><button type="button" id="scene-manual" class="button ${service.ready ? '' : 'primary'}" data-scene-action="add-manual">Add a photo manually</button><input id="scene-file" type="file" accept="image/jpeg,image/png,image/webp" hidden><p class="footnote">JPEG / PNG / WebP · Compressed in your browser</p><p id="scene-processing-summary" class="processing-summary" role="status">${esc(captureNotice())}</p><details class="processing-details"><summary>Recognition service</summary><p id="scene-service-notice">${esc(D.processingNotice(service))}</p><button type="button" class="text-button" data-scene-action="refresh-service">Check connection</button></details></div><div class="scene-start-footer"><span>You can add the owner and sharing terms after saving.</span><button class="text-button" data-scene-action="demo">Try a sample photo →</button></div><div id="scene-error" class="error" role="alert"></div><details class="details"><summary>How photo capture works</summary><div class="details-body"><p>The AI service suggests item names and boundaries. Review each crop, especially overlapping or partially hidden items.</p><p>This browser saves a compressed copy and item thumbnails. Cloud recognition sends the photo to the provider named in the confirmation. Drafts enter the planner after you review them and add them to inventory.</p><p>To use recognition locally, run <code>python3 outputs/local_ai/server.py</code> from the repository root and open <a href="http://127.0.0.1:8765/prototype/">the local workspace</a>. The public sample uses hand-labeled items.</p><button class="text-button" data-scene-action="demo-illustration">Try the illustrated example</button></div></details></div>`);
     $('#scene-select').onclick = () => $('#scene-file').click();
     $('#scene-file').onchange = event => { const file = event.target.files[0]; if (file) processFile(file); };
     hooks.refreshService?.();
@@ -85,12 +85,16 @@
       const compressed = await compress(file); if (token !== generation) return;
       session = { ...compressed, result: null, source: null, thumbnails: {}, locationHint: '' };
       if (location.protocol === 'file:' || !service.ready) throw new Error('Connect the recognition service or try the built-in sample.');
-      $('#scene-progress').textContent = service.remoteProcessing ? 'OpenAI is identifying items in your photo…' : 'The local model is finding items…';
+      $('#scene-progress').textContent = service.remoteProcessing ? `${service.provider} is identifying items in your photo…` : 'The local model is finding items…';
       controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 240000);
       let response;
       try {
-        const http = await fetch('/api/extract-scene', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: compressed.originalImage }), signal: controller.signal });
-        const result = await http.json(); if (!http.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Photo recognition failed. Check the service and try again.'); response = result;
+        response = await window.ResourceAI.extract('/api/extract-scene', {image: compressed.originalImage}, service, controller.signal);
+        if (!response) {
+          session = null;
+          openCapture();
+          return;
+        }
       } finally { clearTimeout(timeout); controller = null; }
       if (token !== generation) return;
       const normalized = D.normalizeResponse(response);
