@@ -21,11 +21,11 @@ SETTINGS = ai.Settings("openai", "gpt-5.4-mini", FAKE_KEY)
 
 
 def body(images=None):
-    message = {"role": "user", "content": "识别可见物品"}
+    message = {"role": "user", "content": "Identify the visible items"}
     if images is not None:
         message["images"] = images
     return {"model": "ignored-local-model", "messages": [
-        {"role": "system", "content": "仅输出数据"}, message],
+        {"role": "system", "content": "Return data only"}, message],
         "format": server.SCENE_SCHEMA, "options": {"num_predict": 2300, "temperature": 0}}
 
 
@@ -257,7 +257,7 @@ class CloudIntegrationTests(TestCase):
 
     def test_component_review_uses_cloud_and_sums_usage(self):
         initial = ai.parse_response(completed(component_scene(), usage={"input_tokens": 20, "output_tokens": 30, "total_tokens": 50}))
-        review = ai.parse_response(completed({"relations": [{"parentId": "scene-001", "childId": "scene-002", "relation": "separate", "evidence": "独立键盘外壳清晰可见"}]}, usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}))
+        review = ai.parse_response(completed({"relations": [{"parentId": "scene-001", "childId": "scene-002", "relation": "separate", "evidence": "The independent keyboard housing is clearly visible."}]}, usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}))
         with patch.object(server, "openai_json", side_effect=[initial, review]) as cloud, patch.object(server, "ollama_json", side_effect=AssertionError("no Ollama")), patch.object(server, "detector_hints", side_effect=AssertionError("no SSD")):
             response = server.extract("scene", {"image": IMAGE})
         self.assertEqual(cloud.call_count, 2)
@@ -268,7 +268,7 @@ class CloudIntegrationTests(TestCase):
 
     def test_component_cloud_failure_preserves_candidates_as_uncertain(self):
         initial = ai.parse_response(completed(component_scene()))
-        with patch.object(server, "openai_json", side_effect=[initial, ai.BackendError("rate_limit", "安全错误", 429)]):
+        with patch.object(server, "openai_json", side_effect=[initial, ai.BackendError("rate_limit", "Safe error", 429)]):
             response = server.extract("scene", {"image": IMAGE})
         self.assertEqual(len(response["data"]["items"]), 2)
         self.assertEqual(response["componentReview"]["status"], "unavailable")
@@ -281,7 +281,7 @@ class CloudIntegrationTests(TestCase):
         self.assertFalse(server.MODEL_LOCK.locked())
 
     def test_cloud_http_error_maps_safe_status_and_releases_lock(self):
-        with patch.object(server, "openai_json", side_effect=ai.BackendError("authentication", "固定安全错误", 503)), self.assertRaises(ai.BackendError):
+        with patch.object(server, "openai_json", side_effect=ai.BackendError("authentication", "Fixed safe error", 503)), self.assertRaises(ai.BackendError):
             server.extract("scene", {"image": IMAGE})
         self.assertFalse(server.MODEL_LOCK.locked())
 
@@ -293,7 +293,7 @@ class LauncherTests(TestCase):
 
     def test_cloud_launcher_does_not_probe_or_launch_ollama(self):
         process = MagicMock(); process.poll.return_value = 0
-        health = {"service": ai.SERVICE, "localOnly": False, "message": "云端已配置"}
+        health = {"service": ai.SERVICE, "localOnly": False, "message": "Cloud service configured"}
         def read(url):
             self.assertNotIn("11435", url)
             return None if read.calls == 0 else health

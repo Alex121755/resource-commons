@@ -29,38 +29,28 @@ def _kind(name):
     # A "laptop keyboard" names a keyboard. Match that before the computer,
     # and notebook computers before paper notebooks. Broad catalog categories
     # are not object identities.
-    if "键盘" in name or _english(name, r"keyboards?"):
-        return "keyboard"
-    if "笔记本电脑" in name or _english(name, r"laptops?|notebook computers?"):
-        return "laptop"
-    if any(s in name for s in ("显示器", "显示屏")) or _english(name, r"monitors?|computer displays?"):
-        return "monitor"
-    if "鼠标" in name or _english(name, r"mouse|mice"):
-        return "mouse"
-    if "手机" in name or _english(name, r"phones?|smartphones?|mobile phones?"):
-        return "phone"
-    if "电脑" in name or _english(name, r"computers?|desktop computers?|pcs?"):
-        return "computer"
-    if any(s in name for s in ("书架", "货架", "置物架", "架子")) or _english(name, r"shel(?:f|ves)|bookcases?|racks?"):
-        return "shelf"
-    if "桌" in name or _english(name, r"tables?|desks?"):
-        return "table"
-    if any(s in name for s in ("水杯", "茶杯", "马克杯", "咖啡杯", "杯子")) or _english(name, r"cups?|mugs?"):
-        return "cup"
-    if any(s in name for s in ("书籍", "课本", "书本", "笔记本")) or name == "书" or _english(name, r"books?|notebooks?"):
-        return "book"
-    if "剪刀" in name or _english(name, r"scissors"):
-        return "scissors"
-    if "椅" in name or _english(name, r"chairs?"):
-        return "chair"
+    patterns = (
+        ("keyboard", r"keyboards?"),
+        ("laptop", r"laptops?|notebook computers?"),
+        ("monitor", r"monitors?|screens?|computer displays?"),
+        ("mouse", r"mouse|mice"),
+        ("phone", r"phones?|smartphones?"),
+        ("computer", r"computers?|pcs?"),
+        ("shelf", r"shel(?:f|ves)|bookshel(?:f|ves)|bookcases?|racks?"),
+        ("table", r"tables?|desks?"),
+        ("cup", r"cups?|teacups?|mugs?"),
+        ("book", r"books?|textbooks?|notebooks?"),
+        ("scissors", r"scissors"),
+        ("chair", r"chairs?"),
+    )
+    for kind, pattern in patterns:
+        if _english(name, pattern):
+            return kind
     return None
 
 
 def _external(name):
-    name = _text(name)
-    return any(s in name for s in ("外置", "外接", "独立", "无线", "蓝牙", "分离", "可拆卸")) or _english(
-        name, r"external|standalone|stand-alone|separate|wireless|bluetooth|detachable"
-    )
+    return _english(_text(name), r"external|stand[ -]?alone|separate|wireless|bluetooth|detachable")
 
 
 def _box(value):
@@ -89,15 +79,19 @@ def _specific_evidence(value):
     value = _text(value)
     if len(re.sub(r"\s", "", value)) < 6:
         return False
-    if any(s in value for s in ("不确定", "可能", "疑似", "推测", "猜测")) or _english(value, r"maybe|perhaps|probably|uncertain|guess(?:ed)?"):
+    if _english(value, r"maybe|perhaps|probably|possibly|uncertain|guess(?:ed)?"):
         return False
-    cues = ("内置", "嵌入", "面板", "机身", "外壳", "连接", "相连", "固定", "轮廓", "边缘", "纹理", "遮挡", "按键", "铰链", "手柄", "标识", "形状", "颜色", "同一位置", "同一物", "同一个物", "一体")
-    return any(c in value for c in cues) or _english(value, r"built[ -]in|embedded|panel|chassis|housing|attached|connected|fixed|outline|edges?|texture|occlusion|keys?|hinge|handle|markings?|shape|colou?rs?|same position|same object|one piece")
+    return _english(
+        value,
+        r"built[ -]in|embedded|panels?|chassis|housing|attached|connected|fixed|outlines?|"
+        r"edges?|textures?|occlusion|keys?|hinges?|handles?|markings?|shapes?|colou?rs?|"
+        r"same position|same object|one piece",
+    )
 
 
 def _same_type(a, b):
     left, right = _text(a.get("name")), _text(b.get("name"))
-    generic = {"", "物品", "东西", "未知", "object", "item", "unknown", "other"}
+    generic = {"", "item", "thing", "unknown", "object", "other"}
     if left == right and left not in generic:
         return True
     left_kind, right_kind = _kind(left), _kind(right)
@@ -166,12 +160,12 @@ def build_grouping(items, relations):
 
     result = {"version": _VERSION, "proposals": [], "notes": notes}
     if not isinstance(items, list):
-        note("物品列表格式无效，未生成合并提议。")
+        note("Invalid item list. No grouping available.")
         return result
     by_id, duplicate_ids = {}, set()
     for item in items:
         if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"].strip() or item["id"] != item["id"].strip():
-            note("存在缺少有效 ID 的物品，相关关系不参与合并。")
+            note("An item is missing a valid ID. Its relationships were skipped.")
             continue
         item_id = item["id"]
         if item_id in by_id:
@@ -180,25 +174,25 @@ def build_grouping(items, relations):
             by_id[item_id] = item
     for item_id in sorted(duplicate_ids):
         by_id.pop(item_id, None)
-        note(f"物品 ID {item_id} 重复，相关关系不参与合并。")
+        note(f"Item ID {item_id} is duplicated. Its relationships were skipped.")
     if not isinstance(relations, list):
-        note("视觉关系列表格式无效，未生成合并提议。")
+        note("Invalid relationship list. No grouping available.")
         return result
 
     valid = []
     for index, relation in enumerate(relations):
         if not isinstance(relation, dict):
-            note(f"关系 {index + 1} 格式无效，已跳过。")
+            note(f"Relationship {index + 1} has an invalid format and was skipped.")
             continue
         parent, child, kind = relation.get("parentId"), relation.get("childId"), relation.get("relation")
         if not isinstance(parent, str) or not isinstance(child, str) or parent not in by_id or child not in by_id:
-            note(f"关系 {index + 1} 引用了不存在或不唯一的物品，已跳过。")
+            note(f"Relationship {index + 1} references a missing or ambiguous item ID and was skipped.")
             continue
         if parent == child:
-            note(f"关系 {index + 1} 引用了物品自身，已跳过。")
+            note(f"Relationship {index + 1} references itself and was skipped.")
             continue
         if not isinstance(kind, str) or kind not in _RELATIONS:
-            note(f"关系 {index + 1} 的类型无效，已跳过。")
+            note(f"Relationship {index + 1} has an invalid type and was skipped.")
             continue
         valid.append((parent, child, kind, relation.get("evidence")))
 
@@ -216,45 +210,45 @@ def build_grouping(items, relations):
     multiply_parented = {child for child, parent_ids in parents.items() if len(parent_ids) > 1}
     cyclic = _cycle_nodes(positive_edges)
     if conflicted_pairs:
-        note("视觉关系存在冲突（含分开、未知或不同关系判断），相关物品对不合并。")
+        note("The visual assessments conflict. These items remain separate.")
     if multiply_parented:
-        note("同一物品有多个父物品，相关关系不合并：" + "、".join(sorted(multiply_parented)) + "。")
+        note("An item has multiple parents. Skipping relationships for " + ", ".join(sorted(multiply_parented)) + ".")
     if cyclic:
-        note("视觉关系形成循环，涉及循环的物品不合并：" + "、".join(sorted(cyclic)) + "。")
+        note("The visual relationships contain a cycle. Keeping these items separate: " + ", ".join(sorted(cyclic)) + ".")
 
     accepted = {}
     for parent, child, kind, evidence in valid:
         if kind not in _POSITIVE:
-            note(f"{parent} → {child} 的视觉判断为{'独立物品' if kind == 'separate' else '关系未知'}，保留分开。")
+            note(f"{parent} → {child} was assessed as {'separate objects' if kind == 'separate' else 'an unknown relationship'}. The items remain separate.")
             continue
         if frozenset((parent, child)) in conflicted_pairs or child in multiply_parented or parent in cyclic or child in cyclic:
             continue
         label = f"{parent} → {child}"
         if not _specific_evidence(evidence):
-            note(f"{label} 缺少具体、明确的视觉依据，未合并。")
+            note(f"{label} lacks specific visual evidence for grouping.")
             continue
         a, b = by_id[parent], by_id[child]
         parent_box, child_box = _box(a.get("bbox")), _box(b.get("bbox"))
         if parent_box is None or child_box is None:
-            note(f"{label} 的框无效或缺失，未合并。")
+            note(f"{label} has an invalid or missing box. Keeping the items separate.")
             continue
         quantities = (a.get("visibleQuantity"), b.get("visibleQuantity"))
         if any(q is not None and (isinstance(q, bool) or not isinstance(q, int) or q < 1 or q > 1) for q in quantities):
-            note(f"{label} 含多件或无效数量，未合并；不能把集合框压成一件。")
+            note(f"{label} includes multiple items or an invalid quantity. Keeping the original candidates.")
             continue
         if kind == "same-object":
             intersection = _intersection(parent_box, child_box)
             iou = intersection / (_area(parent_box) + _area(child_box) - intersection)
             if not _same_type(a, b) or iou + 1e-12 < 0.85:
-                note(f"{label} 不满足同名或同类型及 IoU ≥ 0.85 的重复框条件，未合并。")
+                note(f"{label} does not match the duplicate-box criteria (same name or type and IoU of at least 0.85).")
                 continue
             automatic = False
         else:
             if _placement_pair(a, b) or (_kind(b.get("name")) == "keyboard" and _external(b.get("name"))):
-                note(f"{label} 属于常见放置、配件或明确外置关系，未合并。")
+                note(f"{label} appears to be a placement or accessory relationship. Keeping the items separate.")
                 continue
             if _area(parent_box) < _area(child_box) or _intersection(parent_box, child_box) / _area(child_box) + 1e-12 < 0.8:
-                note(f"{label} 不满足整件框包含部件至少 80% 的几何校验，未合并。")
+                note(f"{label} does not meet the 80% component containment threshold.")
                 continue
             automatic = (_kind(a.get("name")) == "laptop" and _kind(b.get("name")) == "keyboard" and all(q == 1 for q in quantities))
         key = (parent, kind, automatic)
@@ -267,8 +261,8 @@ def build_grouping(items, relations):
         if cleaned not in proposal["evidence"]:
             proposal["evidence"].append(cleaned)
         if None in quantities:
-            note(f"{label} 的数量尚未知，关系提议需要用户确认。")
+            note(f"{label} has an unknown quantity. Review the proposed relationship.")
     for proposal in accepted.values():
-        proposal["evidence"] = "；".join(proposal["evidence"])
+        proposal["evidence"] = " / ".join(proposal["evidence"])
         result["proposals"].append(proposal)
     return result

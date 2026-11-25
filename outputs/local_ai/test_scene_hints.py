@@ -56,7 +56,7 @@ class DetectorSelectionTests(unittest.TestCase):
         output=Path(command[command.index('--out')+1])
         output.write_text(json.dumps({'model':'hard-coded-or-untrusted-cli-label',
             'threshold':.01,'checkpoint_sha256':'wrong-cli-metadata',
-            'detectionProposals':[{'id':'detection-001','label':73,'name':'笔记本电脑',
+            'detectionProposals':[{'id':'detection-001','label':73,'name':'laptop',
                 'category':'electronics','bbox':[10,20,800,900],'score':.7}]}))
         return subprocess.CompletedProcess(command,0)
 
@@ -168,7 +168,7 @@ class DetectorSelectionTests(unittest.TestCase):
         self.assertEqual(result['version'],'v2')
         self.assertEqual(result['checkpoint_sha256'],H._sha256(self.v2))
         self.assertEqual(result['threshold'],.6)
-        self.assertEqual(result['proposals'],[{'name':'笔记本电脑','bbox':[10,20,800,900]}])
+        self.assertEqual(result['proposals'],[{'name':'laptop','bbox':[10,20,800,900]}])
         self.assertNotIn('checkpoint',result)
 
     def test_v1_cli_still_uses_original_threshold_and_reports_hash(self):

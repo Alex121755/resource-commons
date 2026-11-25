@@ -8,16 +8,16 @@
   const STORAGE_KEY = 'resource-commons-community-v1';
   const SELF_ID = 'local-me';
   const MAX_BYTES = 1500000;
-  const categories = Object.freeze({ electronics: '电子设备', tools: '工具', furniture: '家具', stationery: '文具', event: '活动用品', other: '其他物品' });
+  const categories = Object.freeze({ electronics: 'Electronics', tools: 'Tools', furniture: 'Furniture', stationery: 'Stationery', event: 'Event supplies', other: 'Other items' });
   const clone = value => JSON.parse(JSON.stringify(value));
   const fail = message => { throw new Error(message); };
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function object(value, keys, label) {
-    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !keys.includes(k))) fail(label + '的数据格式不正确。');
-    if (keys.some(k => !own(value, k))) fail(label + '缺少必要字段。');
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(k => !keys.includes(k))) fail(label + ' has an invalid format.');
+    if (keys.some(k => !own(value, k))) fail(label + ' is missing required fields.');
   }
   function text(value, min, max, label) {
-    if (typeof value !== 'string' || value.length > max || value.trim().length < min || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)) fail(label + '请填写 ' + min + '—' + max + ' 个字符。');
+    if (typeof value !== 'string' || value.length > max || value.trim().length < min || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)) fail(label + ' must contain ' + min + ' to ' + max + ' characters.');
     return value.trim();
   }
   function identifier(value) { return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(value); }
@@ -25,86 +25,90 @@
   function makeId(prefix) { return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
   function context(options, prefix) {
     const at = options?.at || new Date().toISOString(), id = options?.id || makeId(prefix);
-    if (!timestamp(at) || !identifier(id)) fail('操作时间或编号无效。');
+    if (!timestamp(at) || !identifier(id)) fail('Invalid timestamp or ID.');
     return { at, id };
   }
   function seed() {
     const at = '2026-11-05T01:00:00.000Z';
     const example = (id, type, title, category, quantity, area, description, conditions, ownerLabel) => ({ id, type, title, category, quantity, area, description, conditions, ownerId: 'demo-' + id, ownerLabel, isExample: true, rightsConfirmed: false, status: 'open', createdAt: at, updatedAt: at });
     return { version: 1, scope: 'local-demo', revision: 0, posts: [
-      example('example-tripod', 'offer', '有一副闲置三脚架', 'electronics', 1, '学校附近', '适合活动拍摄。具体承重、接口和使用日期需要再核对。', '先说明用途和时间，确认后再安排交接。', '摄影社 · 示例'),
-      example('example-chairs', 'offer', '六把折叠椅，活动时可协商', 'furniture', 6, '社区活动中心附近', '希望让闲置座椅在活动间隙得到利用。当前状态和可用时段待确认。', '协商数量、搬运和归还时间；尚未批准任何借用。', '邻里小组 · 示例'),
-      example('example-boards', 'request', '周末展示想找两块展板', 'event', 2, '学校附近', '用于作品展，尺寸约 A1；合适的替代材料也可以先沟通。', '具体日期、尺寸和归还方式由双方协商。', '展览小组 · 示例'),
-      example('example-tools', 'offer', '小工具箱，欢迎先问问', 'tools', 1, '社区附近', '包含常用手工具，具体清单与状态需要物主确认。', '限双方同意的用途；借出前逐件确认与登记。', '邻居 · 示例')
+      example('example-tripod', 'offer', 'Spare tripod for filming', 'electronics', 1, 'Near school', 'Suitable for filming events. Check the load limit, connector, and available dates.', 'Tell us the purpose and dates so we can arrange pickup.', 'Photography club · Example'),
+      example('example-chairs', 'offer', 'Six folding chairs for events', 'furniture', 6, 'Near the community center', 'Available between events. Please confirm the chairs’ condition and available dates.', 'Agree on the quantity, transport, and return time before borrowing.', 'Neighborhood group · Example'),
+      example('example-boards', 'request', 'Two boards needed for a weekend exhibit', 'event', 2, 'Near school', 'For a student exhibition, approximately A1. Similar materials are welcome.', 'Discuss dates, dimensions, and return arrangements with the owner.', 'Exhibition team · Example'),
+      example('example-tools', 'offer', 'Small toolbox available', 'tools', 1, 'Near the neighborhood center', 'Includes common hand tools. Ask the owner for the contents and condition.', 'Agree on the intended use and record each tool before pickup.', 'Neighbor · Example')
     ], threads: [] };
   }
   function validateStore(value) {
-    object(value, ['version', 'scope', 'revision', 'posts', 'threads'], '互助记录');
-    if (value.version !== 1 || value.scope !== 'local-demo' || !Number.isSafeInteger(value.revision) || value.revision < 0) fail('互助记录版本或范围不受支持，原记录已保留。');
-    if (!Array.isArray(value.posts) || value.posts.length > 200 || !Array.isArray(value.threads) || value.threads.length > 200) fail('互助记录超出本机演示容量。');
+    object(value, ['version', 'scope', 'revision', 'posts', 'threads'], 'Community data');
+    if (value.version !== 1 || value.scope !== 'local-demo' || !Number.isSafeInteger(value.revision) || value.revision < 0) fail('Unsupported board version or scope. Your records have been retained.');
+    if (!Array.isArray(value.posts) || value.posts.length > 200 || !Array.isArray(value.threads) || value.threads.length > 200) fail('Local demo storage limit exceeded.');
     const postIds = new Set(), threadIds = new Set(), messageIds = new Set(), postThreads = new Set();
     for (const p of value.posts) {
-      object(p, ['id', 'type', 'title', 'category', 'quantity', 'area', 'description', 'conditions', 'ownerId', 'ownerLabel', 'isExample', 'rightsConfirmed', 'status', 'createdAt', 'updatedAt'], '帖子');
-      if (!identifier(p.id) || postIds.has(p.id)) fail('帖子编号无效或重复。');
+      object(p, ['id', 'type', 'title', 'category', 'quantity', 'area', 'description', 'conditions', 'ownerId', 'ownerLabel', 'isExample', 'rightsConfirmed', 'status', 'createdAt', 'updatedAt'], 'Post');
+      if (!identifier(p.id) || postIds.has(p.id)) fail('Invalid or duplicate post ID.');
       postIds.add(p.id);
-      if (!['offer', 'request'].includes(p.type) || !own(categories, p.category) || !['open', 'closed'].includes(p.status)) fail('帖子类型、类别或状态无效。');
-      if (!Number.isInteger(p.quantity) || p.quantity < 1 || p.quantity > 99) fail('数量应为 1—99 的整数。');
-      for (const [key, min, max, label] of [['title', 1, 60, '标题'], ['area', 1, 60, '大致区域'], ['description', 1, 600, '说明'], ['conditions', 1, 300, '协商条件'], ['ownerLabel', 1, 60, '发布者']]) text(p[key], min, max, label);
-      if (!identifier(p.ownerId) || typeof p.isExample !== 'boolean' || typeof p.rightsConfirmed !== 'boolean' || !timestamp(p.createdAt) || !timestamp(p.updatedAt) || p.updatedAt < p.createdAt) fail('帖子来源或时间无效。');
-      if (p.isExample ? !p.ownerId.startsWith('demo-') || p.rightsConfirmed !== false : p.ownerId !== SELF_ID || p.rightsConfirmed !== true || p.ownerLabel !== '我（本机）') fail('帖子必须明确区分虚构示例与本人确认发布。');
+      if (!['offer', 'request'].includes(p.type) || !own(categories, p.category) || !['open', 'closed'].includes(p.status)) fail('Invalid post type, category, or status.');
+      if (!Number.isInteger(p.quantity) || p.quantity < 1 || p.quantity > 99) fail('Quantity must be a whole number from 1 to 99.');
+      for (const [key, min, max, label] of [['title', 1, 60, 'Title'], ['area', 1, 60, 'Area'], ['description', 1, 600, 'Description'], ['conditions', 1, 300, 'Terms'], ['ownerLabel', 1, 60, 'Author']]) text(p[key], min, max, label);
+      if (!identifier(p.ownerId) || typeof p.isExample !== 'boolean' || typeof p.rightsConfirmed !== 'boolean' || !timestamp(p.createdAt) || !timestamp(p.updatedAt) || p.updatedAt < p.createdAt) fail('Invalid post origin or date.');
+      if (p.isExample ? !p.ownerId.startsWith('demo-') || p.rightsConfirmed !== false : p.ownerId !== SELF_ID || p.rightsConfirmed !== true || !['Me (this device)', '\u6211\uFF08\u672C\u673A\uFF09'].includes(p.ownerLabel)) fail('Identify each post as a sample or one you published.');
     }
     let messageCount = 0;
     for (const t of value.threads) {
-      object(t, ['id', 'postId', 'createdAt', 'messages'], '会话');
+      object(t, ['id', 'postId', 'createdAt', 'messages'], 'Conversation');
       const post = value.posts.find(p => p.id === t.postId);
-      if (!identifier(t.id) || threadIds.has(t.id) || !post || post.ownerId === SELF_ID || postThreads.has(t.postId) || !timestamp(t.createdAt) || !Array.isArray(t.messages) || t.messages.length > 200) fail('会话来源或编号无效。');
+      if (!identifier(t.id) || threadIds.has(t.id) || !post || post.ownerId === SELF_ID || postThreads.has(t.postId) || !timestamp(t.createdAt) || !Array.isArray(t.messages) || t.messages.length > 200) fail('Invalid conversation source or ID.');
       threadIds.add(t.id); postThreads.add(t.postId);
       messageCount += t.messages.length;
       for (const m of t.messages) {
-        object(m, ['id', 'role', 'body', 'at', 'localDemo'], '消息');
-        if (!identifier(m.id) || messageIds.has(m.id) || !['me', 'other'].includes(m.role) || m.localDemo !== true || !timestamp(m.at) || m.at < t.createdAt) fail('消息必须是明确标记的本机演示，且编号与时间有效。');
-        text(m.body, 1, 1000, '消息'); messageIds.add(m.id);
+        object(m, ['id', 'role', 'body', 'at', 'localDemo'], 'Messages');
+        if (!identifier(m.id) || messageIds.has(m.id) || !['me', 'other'].includes(m.role) || m.localDemo !== true || !timestamp(m.at) || m.at < t.createdAt) fail('A message needs a valid ID, timestamp, and local demo marker.');
+        text(m.body, 1, 1000, 'Messages'); messageIds.add(m.id);
       }
     }
-    if (messageCount > 2000 || JSON.stringify(value).length > MAX_BYTES) fail('本机演示记录已接近容量上限。');
-    return clone(value);
+    if (messageCount > 2000 || JSON.stringify(value).length > MAX_BYTES) fail('The local demo has reached its record limit.');
+    const result = clone(value);
+    for (const post of result.posts) {
+      if (post.ownerId === SELF_ID) post.ownerLabel = 'Me (this device)';
+    }
+    return result;
   }
   function publishPost(value, input, options) {
     const state = validateStore(value);
-    if (!input || input.rightsConfirmed !== true) fail('请先确认你有权发布这些信息，提供物品时有权发起共享协商。');
+    if (!input || input.rightsConfirmed !== true) fail('Confirm you have permission to publish these details and offer this item.');
     const { id, at } = context(options, 'post');
-    if (state.posts.length >= 200 || state.posts.some(p => p.id === id)) fail('帖子容量已满或编号重复。');
-    if (!['offer', 'request'].includes(input.type) || !own(categories, input.category)) fail('请选择发布类型与类别。');
-    const post = { id, type: input.type, title: text(input.title, 1, 60, '标题'), category: input.category, quantity: input.quantity, area: text(input.area, 1, 60, '大致区域'), description: text(input.description, 1, 600, '说明'), conditions: text(input.conditions, 1, 300, '协商条件'), ownerId: SELF_ID, ownerLabel: '我（本机）', isExample: false, rightsConfirmed: true, status: 'open', createdAt: at, updatedAt: at };
+    if (state.posts.length >= 200 || state.posts.some(p => p.id === id)) fail('Post limit reached or duplicate ID.');
+    if (!['offer', 'request'].includes(input.type) || !own(categories, input.category)) fail('Choose a post type and category.');
+    const post = { id, type: input.type, title: text(input.title, 1, 60, 'Title'), category: input.category, quantity: input.quantity, area: text(input.area, 1, 60, 'Area'), description: text(input.description, 1, 600, 'Description'), conditions: text(input.conditions, 1, 300, 'Terms'), ownerId: SELF_ID, ownerLabel: 'Me (this device)', isExample: false, rightsConfirmed: true, status: 'open', createdAt: at, updatedAt: at };
     state.posts.unshift(post);
     return validateStore(state);
   }
   function closePost(value, postId, options) {
     const state = validateStore(value), post = state.posts.find(p => p.id === postId);
-    if (!post || post.ownerId !== SELF_ID || post.isExample) fail('只能关闭自己在本机明确发布的帖子。');
-    if (post.status !== 'open') fail('这条帖子已经关闭。');
+    if (!post || post.ownerId !== SELF_ID || post.isExample) fail('You can close only posts you published on this device.');
+    if (post.status !== 'open') fail('This post is already closed.');
     const at = options?.at || new Date().toISOString();
-    if (!timestamp(at) || at < post.createdAt) fail('关闭时间无效。');
+    if (!timestamp(at) || at < post.createdAt) fail('Invalid closing time.');
     post.status = 'closed'; post.updatedAt = at;
     return validateStore(state);
   }
   function openThread(value, postId, options) {
     const state = validateStore(value), post = state.posts.find(p => p.id === postId);
-    if (!post || post.ownerId === SELF_ID) fail('请选择其他发布者的帖子。');
+    if (!post || post.ownerId === SELF_ID) fail('Choose another author’s post.');
     const existing = state.threads.find(t => t.postId === postId);
     if (existing) return { state, threadId: existing.id, created: false };
-    if (post.status !== 'open') fail('帖子已关闭，无法开始新会话。');
+    if (post.status !== 'open') fail('Closed posts cannot start a conversation.');
     const { id, at } = context(options, 'thread');
-    if (state.threads.length >= 200 || state.threads.some(t => t.id === id)) fail('会话容量已满或编号重复。');
+    if (state.threads.length >= 200 || state.threads.some(t => t.id === id)) fail('Conversation limit reached or duplicate ID.');
     state.threads.unshift({ id, postId, createdAt: at, messages: [] });
     return { state: validateStore(state), threadId: id, created: true };
   }
   function sendMessage(value, threadId, body, role, options) {
     const state = validateStore(value), thread = state.threads.find(t => t.id === threadId);
-    if (!thread || !['me', 'other'].includes(role)) fail('请选择有效会话与演示身份。');
+    if (!thread || !['me', 'other'].includes(role)) fail('Choose a valid conversation and demo role.');
     const { id, at } = context(options, 'message');
-    if (state.threads.some(t => t.messages.some(m => m.id === id))) fail('消息编号重复。');
-    thread.messages.push({ id, role, body: text(body, 1, 1000, '消息'), at, localDemo: true });
+    if (state.threads.some(t => t.messages.some(m => m.id === id))) fail('Duplicate message ID.');
+    thread.messages.push({ id, role, body: text(body, 1, 1000, 'Messages'), at, localDemo: true });
     return validateStore(state);
   }
   function listPosts(value, options) {
@@ -114,23 +118,23 @@
   function repository(storage) {
     const read = () => {
       try {
-        if (!storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') fail('浏览器未允许本机存储。');
+        if (!storage || typeof storage.getItem !== 'function' || typeof storage.setItem !== 'function') fail('Browser storage is unavailable.');
         const raw = storage.getItem(STORAGE_KEY);
         if (raw === null) return { ok: true, state: seed(), missing: true };
-        if (typeof raw !== 'string' || raw.length > MAX_BYTES) fail('互助记录过大或格式无效。');
+        if (typeof raw !== 'string' || raw.length > MAX_BYTES) fail('Board records exceed the size limit or have an invalid format.');
         return { ok: true, state: validateStore(JSON.parse(raw)), missing: false };
-      } catch (error) { return { ok: false, state: null, missing: false, error: '互助记录暂时无法读取，原记录未改动。' + (error instanceof Error ? error.message : '') }; }
+      } catch (error) { return { ok: false, state: null, missing: false, error: 'Could not read local records. Your data was retained. ' + (error instanceof Error ? error.message : '') }; }
     };
     const commit = (previous, next) => {
       const before = validateStore(previous), after = validateStore(next), current = read();
       if (!current.ok) fail(current.error);
-      if (current.state.revision !== before.revision) fail('另一个页面已更新互助记录，请刷新后再试。');
+      if (current.state.revision !== before.revision) fail('Another tab updated the board. Refresh before continuing.');
       // Read-before-write also prevents overwriting a same-revision edit made outside this module.
-      if (JSON.stringify(current.state) !== JSON.stringify(before)) fail('互助记录已改变，请刷新后再试。');
+      if (JSON.stringify(current.state) !== JSON.stringify(before)) fail('Board records changed. Refresh before continuing.');
       after.revision = before.revision + 1;
       const raw = JSON.stringify(validateStore(after));
-      if (raw.length > MAX_BYTES) fail('本机存储空间不足，请减少记录。');
-      try { storage.setItem(STORAGE_KEY, raw); } catch (_) { fail('保存失败：浏览器存储空间不足或未允许存储。原记录未被主动清除。'); }
+      if (raw.length > MAX_BYTES) fail('Insufficient browser storage. Reduce the number of records.');
+      try { storage.setItem(STORAGE_KEY, raw); } catch (_) { fail('Save failed. Check browser storage permissions and available space.'); }
       return after;
     };
     return { read, commit };

@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     existing = read_json(URL + "/api/health")
     if existing and existing.get("service") == SERVICE:
-        print("原型已经运行：" + URL)
+        print("Prototype already running at " + URL)
         if not args.no_browser:
             webbrowser.open(URL)
         return
@@ -52,7 +52,7 @@ def main():
                         break
                     time.sleep(.25)
             else:
-                print("未找到Ollama，仍可使用手动录入和规则演示。不会自动下载模型。")
+                print("Ollama was not found. Manual entry and sample workflows are available.")
         detector_ready=not settings.remote and (ROOT.parent/'work/training/venv/bin/python').is_file() and (ROOT/'training/ssdlite_pilot_best.pt').is_file()
         server = subprocess.Popen([sys.executable, str(ROOT / "local_ai" / "server.py"), "--port", "8765"], env=dict(os.environ, RESOURCE_OLLAMA_URL=OLLAMA_URL,RESOURCE_SCENE_HINTS='1' if detector_ready else '0'))
         children.append(server)
@@ -60,18 +60,18 @@ def main():
             if read_json(URL + "/api/health"):
                 break
             if server.poll() is not None:
-                raise RuntimeError("启动失败，8765端口可能被其他程序占用。")
+                raise RuntimeError("Startup failed. Check whether port 8765 is in use.")
             time.sleep(.2)
         state = read_json(URL + "/api/health")
         if not state:
-            raise RuntimeError("本地网页未能启动。")
-        print("\n打开：" + URL + "\n" + state.get("message", ""))
-        print("保持本窗口打开。按 Ctrl+C 退出；仅停止本次启动的进程。\n")
+            raise RuntimeError("Could not start the local website.")
+        print("\nOpen " + URL + "\n" + state.get("message", ""))
+        print("Keep this window open while using the app. Press Ctrl+C to exit.\n")
         if not args.no_browser:
             webbrowser.open(URL)
         server.wait()
     except KeyboardInterrupt:
-        print("\n正在停止本次启动的服务。")
+        print("\nStopping local services.")
     finally:
         for process in reversed(children):
             if process.poll() is None:

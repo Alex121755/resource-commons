@@ -12,12 +12,12 @@ def item(item_id, name, bbox=None, quantity=1, category="electronics"):
             "visibleText": "", "uncertainties": []}
 
 
-def relation(parent="laptop", child="keyboard", kind="integrated-part", evidence="键盘的按键嵌入笔记本电脑的机身面板内，外壳连续相连。"):
+def relation(parent="laptop", child="keyboard", kind="integrated-part", evidence="The keys are embedded in the laptop panel and share a continuous housing."):
     return {"parentId": parent, "childId": child, "relation": kind, "evidence": evidence}
 
 
-def laptop_pair(keyboard_name="内置键盘", child_box=None, parent_quantity=1, child_quantity=1):
-    return [item("laptop", "笔记本电脑", [0, 0, 1000, 1000], parent_quantity),
+def laptop_pair(keyboard_name="built-in keyboard", child_box=None, parent_quantity=1, child_quantity=1):
+    return [item("laptop", "laptop", [0, 0, 1000, 1000], parent_quantity),
             item("keyboard", keyboard_name, child_box or [200, 600, 800, 900], child_quantity)]
 
 
@@ -37,53 +37,53 @@ class GroupingPolicyTests(unittest.TestCase):
         self.assertTrue(self.proposal(items)["proposals"][0]["applyByDefault"])
 
     def test_laptop_keyboard_name_is_a_part_not_another_computer(self):
-        for name in ("笔记本电脑键盘", "Laptop keyboard"):
+        for name in ("laptop keyboard", "Laptop keyboard"):
             with self.subTest(name=name):
                 self.assertTrue(self.proposal(laptop_pair(name))["proposals"][0]["applyByDefault"])
 
     def test_plain_paper_notebook_does_not_auto_group_keyboard(self):
         items = laptop_pair()
-        items[0]["name"] = "笔记本"
+        items[0]["name"] = "notebook"
         self.assertFalse(self.proposal(items)["proposals"][0]["applyByDefault"])
 
     def test_generic_laptop_keyboard_uses_explicit_visual_relation(self):
-        self.assertTrue(self.proposal(laptop_pair("电脑键盘"))["proposals"][0]["applyByDefault"])
+        self.assertTrue(self.proposal(laptop_pair("computer keyboard"))["proposals"][0]["applyByDefault"])
 
     def test_containment_without_relations_never_groups(self):
         self.assertEqual(self.proposal(relations=[])["proposals"], [])
 
     def test_overlapping_external_keyboard_does_not_group(self):
-        for name in ("外置键盘", "外接键盘", "独立键盘", "无线键盘", "蓝牙键盘", "External keyboard", "Wireless keyboard", "Bluetooth keyboard", "detachable keyboard"):
+        for name in ("external keyboard", "stand-alone keyboard", "separate keyboard", "wireless keyboard", "Bluetooth keyboard", "External keyboard", "Wireless keyboard", "Bluetooth keyboard", "detachable keyboard"):
             with self.subTest(name=name):
                 result = self.proposal(laptop_pair(name))
                 self.assertEqual(result["proposals"], [])
                 self.assertTrue(result["notes"])
 
     def test_nonoverlapping_keyboard_does_not_group(self):
-        items = [item("laptop", "笔记本电脑", [0, 0, 400, 400]), item("keyboard", "键盘", [600, 600, 900, 900])]
+        items = [item("laptop", "laptop", [0, 0, 400, 400]), item("keyboard", "keyboard", [600, 600, 900, 900])]
         self.assertEqual(self.proposal(items)["proposals"], [])
 
     def test_exact_80_percent_containment_passes(self):
-        items = [item("laptop", "笔记本电脑", [0, 0, 800, 1000]), item("keyboard", "内置键盘", [0, 700, 1000, 900])]
+        items = [item("laptop", "laptop", [0, 0, 800, 1000]), item("keyboard", "built-in keyboard", [0, 700, 1000, 900])]
         self.assertTrue(self.proposal(items)["proposals"][0]["applyByDefault"])
 
     def test_below_80_percent_containment_fails(self):
-        items = [item("laptop", "笔记本电脑", [0, 0, 799, 1000]), item("keyboard", "内置键盘", [0, 700, 1000, 900])]
+        items = [item("laptop", "laptop", [0, 0, 799, 1000]), item("keyboard", "built-in keyboard", [0, 700, 1000, 900])]
         self.assertEqual(self.proposal(items)["proposals"], [])
 
     def test_parent_area_smaller_than_child_fails(self):
-        items = [item("laptop", "笔记本电脑", [0, 0, 800, 800]), item("keyboard", "键盘", [0, 0, 1000, 800])]
+        items = [item("laptop", "laptop", [0, 0, 800, 800]), item("keyboard", "keyboard", [0, 0, 1000, 800])]
         self.assertEqual(self.proposal(items)["proposals"], [])
 
     def test_separate_relation_preserves_overlapping_items(self):
         result = self.proposal(relations=[relation(kind="separate")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("独立物品", " ".join(result["notes"]))
+        self.assertIn("separate objects", " ".join(result["notes"]))
 
     def test_uncertain_relation_does_not_group(self):
         result = self.proposal(relations=[relation(kind="uncertain")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("未知", " ".join(result["notes"]))
+        self.assertIn("unknown", " ".join(result["notes"]))
 
     def test_bad_boxes_fail_closed(self):
         bad_boxes = (None, [], [0, 0, 0, 100], [100, 0, 10, 100], [-1, 0, 100, 100], [0, 0, 1001, 100],
@@ -102,40 +102,40 @@ class GroupingPolicyTests(unittest.TestCase):
     def test_missing_reference_fails_closed(self):
         result = self.proposal(relations=[relation(child="missing")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("引用", " ".join(result["notes"]))
+        self.assertIn("references", " ".join(result["notes"]))
 
     def test_self_reference_fails_closed(self):
         self.assertEqual(self.proposal(relations=[relation(child="laptop")])["proposals"], [])
 
     def test_duplicate_item_id_is_ambiguous(self):
-        items = laptop_pair() + [item("laptop", "另一台笔记本电脑")]
+        items = laptop_pair() + [item("laptop", "another laptop")]
         result = self.proposal(items)
         self.assertEqual(result["proposals"], [])
-        self.assertIn("重复", " ".join(result["notes"]))
+        self.assertIn("duplicated", " ".join(result["notes"]))
 
     def test_cycle_fails_without_choosing_direction(self):
         result = self.proposal(relations=[relation(), relation("keyboard", "laptop")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("循环", " ".join(result["notes"]))
+        self.assertIn("cycle", " ".join(result["notes"]))
 
     def test_longer_cycle_fails(self):
-        items = laptop_pair() + [item("third", "电脑外壳")]
+        items = laptop_pair() + [item("third", "computer housing")]
         result = self.proposal(items, [relation(), relation("keyboard", "third"), relation("third", "laptop")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("循环", " ".join(result["notes"]))
+        self.assertIn("cycle", " ".join(result["notes"]))
 
     def test_multiple_parents_fails_without_picking_largest_box(self):
-        items = laptop_pair() + [item("second", "另一台笔记本电脑")]
+        items = laptop_pair() + [item("second", "another laptop")]
         result = self.proposal(items, [relation(), relation("second", "keyboard")])
         self.assertEqual(result["proposals"], [])
-        self.assertIn("多个父", " ".join(result["notes"]))
+        self.assertIn("multiple parents", " ".join(result["notes"]))
 
     def test_relation_conflict_fails_in_both_orders(self):
         for kinds in (("integrated-part", "separate"), ("uncertain", "integrated-part"), ("integrated-part", "same-object")):
             with self.subTest(kinds=kinds):
                 result = self.proposal(relations=[relation(kind=k) for k in kinds])
                 self.assertEqual(result["proposals"], [])
-                self.assertIn("冲突", " ".join(result["notes"]))
+                self.assertIn("conflict", " ".join(result["notes"]))
 
     def test_reversed_negative_relation_also_blocks(self):
         result = self.proposal(relations=[relation(), relation("keyboard", "laptop", "separate")])
@@ -149,7 +149,7 @@ class GroupingPolicyTests(unittest.TestCase):
                 result = self.proposal(items)
                 self.assertFalse(result["proposals"][0]["applyByDefault"])
                 self.assertEqual(items, before)
-                self.assertIn("数量尚未知", " ".join(result["notes"]))
+                self.assertIn("unknown quantity", " ".join(result["notes"]))
 
     def test_multiple_or_invalid_quantity_never_groups(self):
         for quantity in (2, 5, 0, -1, True, 1.0, "1"):
@@ -160,54 +160,54 @@ class GroupingPolicyTests(unittest.TestCase):
                     self.assertEqual(self.proposal(items)["proposals"], [])
 
     def test_common_placement_pairs_are_denied_even_with_wrong_model_relation(self):
-        pairs = (("书桌", "水杯"), ("Table", "Mug"), ("书架", "书本"), ("Shelf", "Book"),
-                 ("电脑", "鼠标"), ("Laptop", "Mouse"), ("电脑", "手机"), ("Computer", "Phone"),
-                 ("显示器", "外置键盘"), ("Monitor", "External Keyboard"))
+        pairs = (("desk", "water cup"), ("Table", "Mug"), ("bookcase", "book"), ("Shelf", "Book"),
+                 ("computer", "mouse"), ("Laptop", "Mouse"), ("computer", "phone"), ("Computer", "Phone"),
+                 ("monitor", "external keyboard"), ("Monitor", "External Keyboard"))
         for parent, child in pairs:
             with self.subTest(parent=parent, child=child):
                 items = [item("laptop", parent), item("keyboard", child, [100, 100, 400, 400])]
                 self.assertEqual(self.proposal(items)["proposals"], [])
 
     def test_other_credible_part_relation_requires_confirmation(self):
-        items = [item("laptop", "玩具车"), item("keyboard", "车轮", [100, 100, 300, 300])]
-        result = self.proposal(items, [relation(evidence="车轮通过轴连接在玩具车外壳内，固定点可见。")])
+        items = [item("laptop", "toy car"), item("keyboard", "wheel", [100, 100, 300, 300])]
+        result = self.proposal(items, [relation(evidence="An axle connects the wheel to the toy car housing at a visible attachment point.")])
         self.assertEqual(len(result["proposals"]), 1)
         self.assertFalse(result["proposals"][0]["applyByDefault"])
 
     def test_same_object_requires_same_type_and_high_iou(self):
-        items = [item("laptop", "剪刀", [0, 0, 1000, 1000], category="tools"),
-                 item("keyboard", "黑色 scissors", [0, 0, 950, 1000], category="tools")]
-        result = self.proposal(items, [relation(kind="same-object", evidence="两个框覆盖同一把剪刀的金属边缘和黑色手柄。")])
+        items = [item("laptop", "scissors", [0, 0, 1000, 1000], category="tools"),
+                 item("keyboard", "black scissors", [0, 0, 950, 1000], category="tools")]
+        result = self.proposal(items, [relation(kind="same-object", evidence="The two boxes cover the same metal scissors edges and black handle.")])
         self.assertFalse(result["proposals"][0]["applyByDefault"])
 
     def test_same_name_duplicate_at_exact_iou_threshold_passes(self):
-        items = [item("laptop", "红色收纳盒"), item("keyboard", "红色收纳盒", [0, 0, 850, 1000])]
-        result = self.proposal(items, [relation(kind="same-object", evidence="两个框覆盖同一物品的红色外壳和边缘。")])
+        items = [item("laptop", "red storage box"), item("keyboard", "red storage box", [0, 0, 850, 1000])]
+        result = self.proposal(items, [relation(kind="same-object", evidence="The two boxes cover the same red housing and edge.")])
         self.assertEqual(len(result["proposals"]), 1)
 
     def test_duplicate_below_iou_threshold_fails(self):
-        items = [item("laptop", "剪刀"), item("keyboard", "剪刀", [0, 0, 849, 1000])]
+        items = [item("laptop", "scissors"), item("keyboard", "scissors", [0, 0, 849, 1000])]
         self.assertEqual(self.proposal(items, [relation(kind="same-object")])["proposals"], [])
 
     def test_same_category_does_not_mean_same_object(self):
-        items = [item("laptop", "手机"), item("keyboard", "鼠标")]
+        items = [item("laptop", "phone"), item("keyboard", "mouse")]
         self.assertEqual(self.proposal(items, [relation(kind="same-object")])["proposals"], [])
 
     def test_different_overlapping_objects_never_merge_as_duplicate(self):
         self.assertEqual(self.proposal(relations=[relation(kind="same-object")])["proposals"], [])
 
     def test_identical_names_and_boxes_but_separate_relation_stay_separate(self):
-        items = [item("laptop", "书"), item("keyboard", "书")]
+        items = [item("laptop", "book"), item("keyboard", "book")]
         self.assertEqual(self.proposal(items, [relation(kind="separate")])["proposals"], [])
 
     def test_unknown_generic_names_cannot_prove_duplicate_identity(self):
-        for name in (None, "物品", "unknown", "object"):
+        for name in (None, "item", "unknown", "object"):
             with self.subTest(name=name):
                 items = [item("laptop", name), item("keyboard", name)]
                 self.assertEqual(self.proposal(items, [relation(kind="same-object")])["proposals"], [])
 
     def test_empty_generic_or_speculative_evidence_fails(self):
-        for evidence in (None, "", " ", "是", "这是一个部件", "integrated-part", "可能内置在面板", "probably attached to chassis"):
+        for evidence in (None, "", " ", "yes", "This is a component", "integrated-part", "Maybe built into the panel", "probably attached to chassis"):
             with self.subTest(evidence=evidence):
                 self.assertEqual(self.proposal(relations=[relation(evidence=evidence)])["proposals"], [])
 
@@ -222,7 +222,7 @@ class GroupingPolicyTests(unittest.TestCase):
         self.assertEqual(result["proposals"][0]["evidence"], relation()["evidence"])
 
     def test_independent_valid_pair_survives_unrelated_cycle(self):
-        items = laptop_pair() + [item("x", "配件一"), item("y", "配件二")]
+        items = laptop_pair() + [item("x", "accessory one"), item("y", "accessory two")]
         result = self.proposal(items, [relation(), relation("x", "y"), relation("y", "x")])
         self.assertEqual(result["proposals"][0]["parentId"], "laptop")
         self.assertEqual(len(result["proposals"]), 1)

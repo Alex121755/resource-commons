@@ -35,7 +35,7 @@ class BackendError(OSError):
 
 
 def configuration_error():
-    return BackendError("configuration", "云端 AI 配置无效或缺少密钥，请检查后端配置；本次未修改任何记录。")
+    return BackendError("configuration", "Check the cloud AI configuration and API key.")
 
 
 @dataclass(frozen=True)
@@ -192,26 +192,26 @@ def image_data_url(value):
             raise ValueError()
         return "data:" + mime + ";base64," + value
     except (ValueError, TypeError):
-        raise BackendError("image", "图片编码或实际格式无效，请重新选择 PNG、JPEG 或 WebP。", 400) from None
+        raise BackendError("image", "Choose a valid PNG, JPEG or WebP image.", 400) from None
 
 
 def build_payload(settings, body):
     if not isinstance(body, dict) or not isinstance(body.get("format"), dict):
-        raise BackendError("request", "AI 请求结构无效；本次未修改任何记录。", 400)
+        raise BackendError("request", "Invalid AI request format.", 400)
     messages = []
     image_count = 0
     for message in body.get("messages", []):
         if message.get("role") not in ("system", "user", "assistant") or not isinstance(message.get("content"), str):
-            raise BackendError("request", "AI 请求结构无效；本次未修改任何记录。", 400)
+            raise BackendError("request", "Invalid AI request format.", 400)
         content = [{"type": "input_text", "text": message["content"]}]
         for encoded in message.get("images", []):
             image_count += 1
             if image_count > 4:
-                raise BackendError("image", "单次 AI 请求最多四张分析图片。", 400)
+                raise BackendError("image", "Each AI request accepts up to four images.", 400)
             content.append({"type": "input_image", "image_url": image_data_url(encoded), "detail": "auto"})
         messages.append({"role": message["role"], "content": content})
     if not messages:
-        raise BackendError("request", "AI 请求缺少输入；本次未修改任何记录。", 400)
+        raise BackendError("request", "Add text or an image to the AI request.", 400)
     # Reasoning tokens share the output budget. A scene gets at most 6000; the
     # smaller item/request/review calls at most 4096. No automatic retry is used.
     requested = body.get("options", {}).get("num_predict", 1300)
@@ -244,26 +244,26 @@ def safe_usage(value):
 
 def parse_response(result):
     if not isinstance(result, dict):
-        raise BackendError("invalid_response", "云端 AI 返回格式异常；本次未保存任何草稿。", 502)
+        raise BackendError("invalid_response", "The cloud service returned an unexpected response.", 502)
     if result.get("status") == "incomplete":
-        raise BackendError("incomplete", "云端 AI 输出未完成，请分区补拍或缩短输入后重试；本次未保存草稿。", 502)
+        raise BackendError("incomplete", "The cloud response was incomplete. Try a shorter request or photograph a smaller area.", 502)
     if result.get("status") != "completed":
-        raise BackendError("unavailable", "云端 AI 未完成分析，请稍后手动重试；本次未修改任何记录。", 502)
+        raise BackendError("unavailable", "The cloud service could not finish the analysis. Try again later.", 502)
     texts = []
     output = result.get("output")
     if not isinstance(output, list):
-        raise BackendError("invalid_response", "云端 AI 返回格式异常；本次未保存任何草稿。", 502)
+        raise BackendError("invalid_response", "The cloud service returned an unexpected response.", 502)
     for message in output:
         if not isinstance(message, dict) or message.get("type") != "message":
             continue
         content = message.get("content", [])
         if not isinstance(content, list):
-            raise BackendError("invalid_response", "云端 AI 返回格式异常；本次未保存任何草稿。", 502)
+            raise BackendError("invalid_response", "The cloud service returned an unexpected response.", 502)
         for block in content:
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "refusal":
-                raise BackendError("refusal", "云端 AI 无法分析这次输入，可更换照片或手动记录；本次未保存草稿。", 422)
+                raise BackendError("refusal", "The cloud service could not analyze this input. Try a different photo or enter the item manually.", 422)
             if block.get("type") == "output_text" and isinstance(block.get("text"), str):
                 texts.append(block["text"])
     text = "".join(texts)
@@ -272,7 +272,7 @@ def parse_response(result):
         if not isinstance(value, dict):
             raise ValueError()
     except (ValueError, TypeError):
-        raise BackendError("invalid_json", "云端 AI 没有返回完整的物品结构，请手动重试；本次未保存草稿。", 502) from None
+        raise BackendError("invalid_json", "The cloud service returned incomplete item data. Try again.", 502) from None
     return {"message": {"content": json.dumps(value, ensure_ascii=False)},
             "done_reason": "stop", "usage": safe_usage(result.get("usage"))}
 
@@ -280,14 +280,14 @@ def parse_response(result):
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # Never forward an Authorization header to another host or endpoint.
-        raise BackendError("redirect", "云端 AI 连接被重定向，已停止请求；本次未修改任何记录。", 502)
+        raise BackendError("redirect", "The cloud connection was redirected. The request was stopped.", 502)
 
 
 def openai_json(settings, body, timeout=180):
     if not settings.remote or not settings.api_key:
         raise configuration_error()
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
-        raise BackendError("timeout", "AI 请求时间预算已耗尽；本次未修改任何记录。", 504)
+        raise BackendError("timeout", "The AI request timed out.", 504)
     timeout = min(float(timeout), 180)
     payload = build_payload(settings, body)
     req = Request(RESPONSES_URL, data=json.dumps(payload, ensure_ascii=False, allow_nan=False).encode(),
@@ -299,25 +299,25 @@ def openai_json(settings, body, timeout=180):
         with opener.open(req, timeout=timeout) as response:
             raw = response.read(MAX_RESPONSE_BYTES + 1)
             if len(raw) > MAX_RESPONSE_BYTES:
-                raise BackendError("oversized_response", "云端 AI 返回内容过大，已停止处理；本次未保存草稿。", 502)
+                raise BackendError("oversized_response", "The cloud response exceeded the size limit.", 502)
         result = json.loads(raw)
     except BackendError:
         raise
     except HTTPError as exc:
         # Do not read or return the provider's body, URL, or headers.
         if exc.code in (401, 403):
-            raise BackendError("authentication", "云端 AI 密钥或账户权限不可用，请检查后端配置；本次未修改任何记录。") from None
+            raise BackendError("authentication", "Check the cloud API key and account permissions.") from None
         if exc.code == 429:
-            raise BackendError("rate_limit", "云端 AI 暂时达到额度或速率限制，请稍后手动重试；本次未修改任何记录。", 429) from None
+            raise BackendError("rate_limit", "The cloud service reached its quota or rate limit. Try again later.", 429) from None
         if 400 <= exc.code < 500:
-            raise BackendError("provider_request", "云端 AI 拒绝了请求配置，请检查后端模型与参数；本次未修改任何记录。", 502) from None
-        raise BackendError("provider_unavailable", "云端 AI 暂时不可用，请稍后手动重试；本次未修改任何记录。", 503) from None
+            raise BackendError("provider_request", "The cloud service rejected the request settings. Check the model and parameters.", 502) from None
+        raise BackendError("provider_unavailable", "The cloud service is temporarily unavailable. Try again later.", 503) from None
     except (TimeoutError, socket.timeout):
-        raise BackendError("timeout", "云端 AI 响应超时，请稍后手动重试；本次未修改任何记录。", 504) from None
+        raise BackendError("timeout", "The cloud service timed out. Try again later.", 504) from None
     except URLError as exc:
         if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-            raise BackendError("timeout", "云端 AI 响应超时，请稍后手动重试；本次未修改任何记录。", 504) from None
-        raise BackendError("connection", "无法连接云端 AI，请检查网络或受控代理；本次未修改任何记录。") from None
+            raise BackendError("timeout", "The cloud service timed out. Try again later.", 504) from None
+        raise BackendError("connection", "Could not reach the cloud service. Check the network or configured proxy.") from None
     except (OSError, ValueError, TypeError, UnicodeError):
-        raise BackendError("invalid_response", "云端 AI 连接或返回格式异常，请稍后手动重试；本次未修改任何记录。", 502) from None
+        raise BackendError("invalid_response", "Unexpected cloud connection or response. Try again later.", 502) from None
     return parse_response(result)

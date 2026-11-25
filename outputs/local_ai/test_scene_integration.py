@@ -5,9 +5,9 @@ from test_server import IMAGE
 
 def sample():
     return {'items':[
-       {'id':'laptop','name':'笔记本电脑','category':'electronics','bbox':[100,100,900,900],'visibleQuantity':1,'visibleText':'','uncertainties':[]},
-       {'id':'keys','name':'内置键盘','category':'electronics','bbox':[200,600,800,850],'visibleQuantity':1,'visibleText':'','uncertainties':[]}],
-       'relations':[{'parentId':'laptop','childId':'keys','relation':'integrated-part','evidence':'按键面板嵌入笔记本机身，与外壳连接成一体'}],
+       {'id':'laptop','name':'laptop','category':'electronics','bbox':[100,100,900,900],'visibleQuantity':1,'visibleText':'','uncertainties':[]},
+       {'id':'keys','name':'built-in keyboard','category':'electronics','bbox':[200,600,800,850],'visibleQuantity':1,'visibleText':'','uncertainties':[]}],
+       'relations':[{'parentId':'laptop','childId':'keys','relation':'integrated-part','evidence':'The key panel is embedded in the laptop chassis and connected to the housing.'}],
        'sceneNotes':[]}
 
 class SceneIntegrationTests(unittest.TestCase):
@@ -26,14 +26,14 @@ class SceneIntegrationTests(unittest.TestCase):
         self.assertNotIn('relations',r['data'])
 
     def test_detector_proposals_are_optional_visual_hints(self):
-        r,payload=self.run_scene(sample(),{'used':True,'model':'frozen','threshold':.35,'proposals':[{'name':'键盘','bbox':[1,2,3,4]}]})
-        self.assertIn('可能误框',payload['messages'][1]['content'])
+        r,payload=self.run_scene(sample(),{'used':True,'model':'frozen','threshold':.35,'proposals':[{'name':'keyboard','bbox':[1,2,3,4]}]})
+        self.assertIn('Boxes may be wrong',payload['messages'][1]['content'])
         self.assertTrue(r['detectorAssist']['used'])
         self.assertNotIn('proposals',r['detectorAssist'])
         self.assertTrue(r['requiresHumanConfirmation'])
 
     def test_external_keyboard_is_retained(self):
-        d=sample();d['items'][1]['name']='外置无线键盘'
+        d=sample();d['items'][1]['name']='external wireless keyboard'
         r,_=self.run_scene(d)
         self.assertFalse(any(x['applyByDefault'] for x in r['grouping']['proposals']))
         self.assertEqual(len(r['data']['items']),2)
@@ -56,12 +56,12 @@ class SceneIntegrationTests(unittest.TestCase):
 
     def test_same_parent_keeps_automatic_group_and_other_source_independent(self):
         d=sample()
-        d['items'].append({'id':'screen','name':'显示屏','category':'electronics',
+        d['items'].append({'id':'screen','name':'screen','category':'electronics',
             'bbox':[200,200,800,500],'visibleQuantity':1,'visibleText':'','uncertainties':[]})
         # Put the nonautomatic proposal first to verify priority over input order.
         d['relations'].insert(0,{'parentId':'laptop','childId':'screen',
-            'relation':'integrated-part','evidence':'显示屏通过铰链与笔记本机身连接成一体'})
-        d['sceneNotes']=['已有场景说明'+str(i) for i in range(12)]
+            'relation':'integrated-part','evidence':'The screen is connected by a hinge to the laptop chassis.'})
+        d['sceneNotes']=['Existing scene note '+str(i) for i in range(12)]
         original=copy.deepcopy(d)
         r,_=self.run_scene(d)
         self.assertEqual(len(r['grouping']['proposals']),1)
@@ -71,14 +71,14 @@ class SceneIntegrationTests(unittest.TestCase):
             [i['name'] for i in original['items']])
         self.assertEqual([i['bbox'] for i in r['data']['items']],
             [i['bbox'] for i in original['items']])
-        self.assertTrue(any('显示屏' in n and '保留独立' in n for n in r['data']['sceneNotes']))
+        self.assertTrue(any('screen' in n and 'remain independent' in n for n in r['data']['sceneNotes']))
         self.assertLessEqual(len(r['data']['sceneNotes']),12)
 
     def test_adapter_priority_and_no_mutation(self):
         def proposal(parent,child,relation,automatic):
             return {'parentId':parent,'childIds':[child],'relation':relation,
-                'evidence':'机身边缘可见连接','applyByDefault':automatic}
-        grouping={'version':1,'notes':['原有说明'],'proposals':[
+                'evidence':'A joint is visible at the chassis edge.','applyByDefault':automatic}
+        grouping={'version':1,'notes':['Original note'],'proposals':[
             proposal('a','a-copy','same-object',False),
             proposal('a','a-part','integrated-part',False),
             proposal('b','b-part','integrated-part',False),
@@ -89,20 +89,20 @@ class SceneIntegrationTests(unittest.TestCase):
         chosen={p['parentId']:p['childIds'] for p in adapted['proposals']}
         self.assertEqual(chosen,{'a':['a-part'],'b':['b-auto']})
         self.assertEqual(set(adapted),{'version','proposals'})
-        self.assertTrue(any('a-copy' in n and '保留独立' in n for n in notes))
-        self.assertTrue(any('b-part' in n and '保留独立' in n for n in notes))
-        self.assertIn('原有说明',notes)
+        self.assertTrue(any('a-copy' in n and 'remain independent' in n for n in notes))
+        self.assertTrue(any('b-part' in n and 'remain independent' in n for n in notes))
+        self.assertIn('Original note',notes)
 
     def test_long_evidence_fits_frontend_utf16_limit(self):
         d=sample()
         # The final emoji straddles the JavaScript 500-code-unit boundary.
-        evidence='机身连接'+('中'*495)+'😀后续说明'
+        evidence='key '+('x'*495)+'😀additional notes'
         d['relations'][0]['evidence']=evidence
         r,_=self.run_scene(d)
         kept=r['grouping']['proposals'][0]['evidence']
         self.assertLessEqual(len(kept.encode('utf-16-le'))//2,500)
         self.assertTrue(evidence.startswith(kept))
         self.assertEqual(len(r['data']['items']),2)
-        self.assertTrue(any('依据过长' in n for n in r['data']['sceneNotes']))
+        self.assertTrue(any('evidence longer' in n for n in r['data']['sceneNotes']))
 
 if __name__=='__main__':unittest.main()

@@ -4,30 +4,30 @@ from component_review import review,candidate_pairs,review_images
 from server import validate_schema
 
 def items():return [
- {'id':'p','name':'笔记本电脑','bbox':[0,0,1000,1000],'visibleQuantity':1,'uncertainties':[]},
- {'id':'c','name':'外置键盘','bbox':[200,650,800,900],'visibleQuantity':1,'uncertainties':[]}]
+ {'id':'p','name':'laptop','bbox':[0,0,1000,1000],'visibleQuantity':1,'uncertainties':[]},
+ {'id':'c','name':'external keyboard','bbox':[200,650,800,900],'visibleQuantity':1,'uncertainties':[]}]
 
 def answer(relation='integrated-part',parent='p',child='c'):
-    return {'message':{'content':json.dumps({'relations':[{'parentId':parent,'childId':child,'relation':relation,'evidence':'按键面板嵌入底座，与机身的边缘和铰链连接为一体。'}]})},'done_reason':'stop'}
+    return {'message':{'content':json.dumps({'relations':[{'parentId':parent,'childId':child,'relation':relation,'evidence':'The key panel is embedded in the base, connected to the chassis edge and hinge.'}]})},'done_reason':'stop'}
 
 class ReviewTests(unittest.TestCase):
     def test_focused_image_review_can_correct_initial_label(self):
         data=items();call=Mock(return_value=answer())
         relations,audit=review(data,'BASE64','model',call,validate_schema)
-        self.assertEqual(data[1]['name'],'内置键盘候选')
-        self.assertIn('外置键盘',data[1]['uncertainties'][0])
+        self.assertEqual(data[1]['name'],'Built-in keyboard candidate')
+        self.assertIn('external keyboard',data[1]['uncertainties'][0])
         self.assertEqual(data[1]['bbox'],[200,650,800,900])
         self.assertEqual(relations[0]['relation'],'integrated-part')
-        self.assertEqual(audit['originalNames'][0]['name'],'外置键盘')
+        self.assertEqual(audit['originalNames'][0]['name'],'external keyboard')
         self.assertEqual(call.call_args.args[1]['messages'][1]['images'],['BASE64'])
 
     def test_separate_overlapping_keyboard_remains_independent(self):
         data=items();r,a=review(data,'base','model',Mock(return_value=answer('separate')),validate_schema)
-        self.assertEqual(r[0]['relation'],'separate');self.assertEqual(data[1]['name'],'外置键盘')
+        self.assertEqual(r[0]['relation'],'separate');self.assertEqual(data[1]['name'],'external keyboard')
 
     def test_unknown_or_failed_review_does_not_force_merge(self):
         data=items();r,a=review(data,'base','model',Mock(side_effect=OSError('offline')),validate_schema)
-        self.assertEqual(r[0]['relation'],'uncertain');self.assertEqual(data[1]['name'],'外置键盘')
+        self.assertEqual(r[0]['relation'],'uncertain');self.assertEqual(data[1]['name'],'external keyboard')
 
     def test_bad_ids_and_duplicate_answers_become_unknown(self):
         data=items();r,_=review(data,'base','model',Mock(return_value=answer(parent='invented')),validate_schema)

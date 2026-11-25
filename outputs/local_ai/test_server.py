@@ -8,19 +8,19 @@ from unittest.mock import patch
 import server
 
 def sample():
-    return {"purpose":"拍桌面视频", "needs":[{"id":"phone","label":"手机支架","sourceText":"3套手机支架","quantity":3,"phoneWidthMm":80,"phoneWeightG":250}],
-            "startLocal":"2026-11-05T14:00","endLocal":"2026-11-05T17:00","allowAlternatives":True,"missingQuestions":["是否接受替代？"],
-            "evidence":[{"field":"quantity","quote":"3套手机支架"}]}
+    return {"purpose":"Film a desktop video", "needs":[{"id":"phone","label":"phone stand","sourceText":"3 phone stands","quantity":3,"phoneWidthMm":80,"phoneWeightG":250}],
+            "startLocal":"2026-11-05T14:00","endLocal":"2026-11-05T17:00","allowAlternatives":True,"missingQuestions":["Are alternatives acceptable?"],
+            "evidence":[{"field":"quantity","quote":"3 phone stands"}]}
 
-TEXT = "需要3套手机支架，手机宽80毫米，重250克。2026年11月5日14:00到17:00，可以替代。"
+TEXT = "I need 3 phone stands. The phone is 80 mm wide and weighs 250 g. Use them on 2026-11-05 from 14:00 to 17:00. Alternatives are fine."
 IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aQ3sAAAAASUVORK5CYII="
 
 def scene_sample():
     return {"items": [
-        {"id": "model-a", "name": "笔记本电脑", "category": "electronics",
+        {"id": "model-a", "name": "laptop", "category": "electronics",
          "bbox": [50, 100, 600, 850], "visibleQuantity": 1,
-         "visibleText": "", "uncertainties": ["型号标签未看清"]},
-        {"id": "model-b", "name": "剪刀", "category": "tools",
+         "visibleText": "", "uncertainties": ["The model label is unclear."]},
+        {"id": "model-b", "name": "scissors", "category": "tools",
          "bbox": [650, 200, 950, 700], "visibleQuantity": 1,
          "visibleText": "", "uncertainties": []}], "sceneNotes": []}
 
@@ -45,7 +45,7 @@ class AdapterTests(TestCase):
         with self.assertRaises(ValueError): self.run_model(d)
 
     def test_ungrounded_need_removed(self):
-        d=sample();d["needs"].append({"id":"chair","label":"椅子","sourceText":"四把椅子","quantity":4,"phoneWidthMm":None,"phoneWeightG":None})
+        d=sample();d["needs"].append({"id":"chair","label":"chair","sourceText":"four chairs","quantity":4,"phoneWidthMm":None,"phoneWeightG":None})
         self.assertEqual(len(self.run_model(d)["needs"]),1)
 
     def test_wrong_category_for_quote_removed(self):
@@ -53,14 +53,14 @@ class AdapterTests(TestCase):
         self.assertEqual(self.run_model(d)["needs"],[])
 
     def test_fabricated_global_quote_removed(self):
-        d=sample();d["evidence"].append({"field":"owner","quote":"管理员批准"})
+        d=sample();d["evidence"].append({"field":"owner","quote":"approved by administrator"})
         self.assertEqual(len(self.run_model(d)["evidence"]),1)
 
     def test_unknown_quantity_remains_null(self):
         d=sample();d["needs"][0]["quantity"]=None
         out=self.run_model(d)
         self.assertIsNone(out["needs"][0]["quantity"])
-        self.assertTrue(any("多少" in q for q in out["missingQuestions"]))
+        self.assertTrue(any("how many" in q for q in out["missingQuestions"]))
 
     def test_complete_fields_no_repeat_question(self):
         self.assertEqual(self.run_model(sample())["missingQuestions"],[])
@@ -78,8 +78,8 @@ class AdapterTests(TestCase):
         with self.assertRaises(ValueError): self.run_model(d)
 
     def test_unsupported_need_preserved(self):
-        d=sample();d["needs"][0].update(id="unsupported",label="投影仪",sourceText="2个投影仪",quantity=2)
-        self.assertEqual(self.run_model(d,"需要2个投影仪")["needs"][0]["id"],"unsupported")
+        d=sample();d["needs"][0].update(id="unsupported",label="projector",sourceText="2 projectors",quantity=2)
+        self.assertEqual(self.run_model(d,"I need 2 projectors")["needs"][0]["id"],"unsupported")
 
     def test_empty_input_rejected_before_call(self):
         with self.assertRaises(ValueError): server.extract("request",{"text":" "})
@@ -98,11 +98,11 @@ class SceneTests(TestCase):
     def run_scene(self, data, body=None, done_reason="stop"):
         with patch.object(server, "ollama_json", return_value={
                 "message": {"content": json.dumps(data)}, "done_reason": done_reason}):
-            return server.extract("scene", body or {"image": IMAGE, "text": "请记录桌上物品"})
+            return server.extract("scene", body or {"image": IMAGE, "text": "Record the items on the desk."})
 
     def test_two_objects_retained_with_distinct_response_ids(self):
         out = self.run_scene(scene_sample())
-        self.assertEqual([i["name"] for i in out["data"]["items"]], ["笔记本电脑", "剪刀"])
+        self.assertEqual([i["name"] for i in out["data"]["items"]], ["laptop", "scissors"])
         self.assertEqual([i["id"] for i in out["data"]["items"]], ["scene-001", "scene-002"])
         self.assertTrue(out["localOnly"])
         self.assertTrue(out["requiresHumanConfirmation"])
@@ -117,7 +117,7 @@ class SceneTests(TestCase):
 
     def test_old_inventory_category_is_not_scene_category(self):
         d = scene_sample(); d["items"][0]["category"] = "tripod"
-        with self.assertRaisesRegex(ValueError, "允许范围"):
+        with self.assertRaisesRegex(ValueError, "allowed range"):
             self.run_scene(d)
 
     def test_duplicate_ids_canonicalized_without_removing_items(self):
@@ -144,7 +144,7 @@ class SceneTests(TestCase):
                 d = scene_sample(); d["items"][0]["bbox"] = bbox
                 item = self.run_scene(d)["data"]["items"][0]
                 self.assertIsNone(item["bbox"])
-                self.assertTrue(any("已取消裁切" in x for x in item["uncertainties"]))
+                self.assertTrue(any("cropping was skipped" in x for x in item["uncertainties"]))
 
     def test_valid_edge_box_preserved_without_inventing_padding(self):
         d = scene_sample(); d["items"][0]["bbox"] = [0, 0.25, 1000, 999.75]
@@ -156,7 +156,7 @@ class SceneTests(TestCase):
                 d = scene_sample(); d["items"][0]["visibleQuantity"] = quantity
                 item = self.run_scene(d)["data"]["items"][0]
                 self.assertIsNone(item["visibleQuantity"])
-                self.assertTrue(any("数量" in x for x in item["uncertainties"]))
+                self.assertTrue(any("quantity" in x for x in item["uncertainties"]))
 
     def test_boolean_quantity_rejected(self):
         d = scene_sample(); d["items"][0]["visibleQuantity"] = True
@@ -166,31 +166,31 @@ class SceneTests(TestCase):
         d = scene_sample(); d["items"] = [copy.deepcopy(d["items"][0]) for _ in range(12)]
         self.assertEqual(len(self.run_scene(d)["data"]["items"]), 12)
         d["items"].append(copy.deepcopy(d["items"][0]))
-        with self.assertRaisesRegex(ValueError, "没有截断清单"):
+        with self.assertRaisesRegex(ValueError, "not truncated"):
             self.run_scene(d)
 
     def test_extra_item_authority_or_state_fields_rejected(self):
         for field in ["owner", "location", "permissions", "approved", "condition", "specs"]:
             with self.subTest(field=field):
-                d = scene_sample(); d["items"][0][field] = "模型不得决定"
-                with self.assertRaisesRegex(ValueError, "未允许字段"): self.run_scene(d)
+                d = scene_sample(); d["items"][0][field] = "The model must not decide"
+                with self.assertRaisesRegex(ValueError, "unexpected field"): self.run_scene(d)
 
     def test_extra_top_level_permission_rejected(self):
         d = scene_sample(); d["approved"] = True
-        with self.assertRaisesRegex(ValueError, "未允许字段"): self.run_scene(d)
+        with self.assertRaisesRegex(ValueError, "unexpected field"): self.run_scene(d)
 
     def test_input_permission_rejected_before_model_call(self):
         with patch.object(server, "ollama_json") as model:
-            with self.assertRaisesRegex(ValueError, "不接受授权"):
+            with self.assertRaisesRegex(ValueError, "Permission, location and inventory fields are rejected"):
                 server.extract("scene", {"image": IMAGE, "approved": True})
             model.assert_not_called()
 
     def test_missing_required_box_rejected(self):
         d = scene_sample(); del d["items"][0]["bbox"]
-        with self.assertRaisesRegex(ValueError, "必填字段"): self.run_scene(d)
+        with self.assertRaisesRegex(ValueError, "required field"): self.run_scene(d)
 
     def test_empty_scene_preserved_with_notes(self):
-        d = {"items": [], "sceneNotes": ["图片模糊，没有可辨主体，请补拍。"]}
+        d = {"items": [], "sceneNotes": ["The photo is blurry. Take a clearer picture."]}
         self.assertEqual(self.run_scene(d)["data"], d)
 
     def test_local_image_and_scene_token_budget_sent_to_real_adapter(self):
@@ -214,12 +214,12 @@ class SceneTests(TestCase):
     def test_decoded_image_over_three_mb_rejected_before_call(self):
         image = "data:image/png;base64," + base64.b64encode(b"x" * 3_000_001).decode()
         with patch.object(server, "ollama_json") as model:
-            with self.assertRaisesRegex(ValueError, "超过3MB"):
+            with self.assertRaisesRegex(ValueError, "exceeds 3 MB"):
                 server.extract("scene", {"image": image})
             model.assert_not_called()
 
     def test_truncated_model_reply_never_returned_as_complete(self):
-        with self.assertRaisesRegex(ValueError, "不完整"):
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
             self.run_scene(scene_sample(), done_reason="length")
 
     def test_lock_released_after_bad_scene_output(self):
@@ -229,7 +229,7 @@ class SceneTests(TestCase):
         self.assertEqual(len(self.run_scene(scene_sample())["data"]["items"]), 2)
 
     def test_existing_item_endpoint_keeps_its_schema(self):
-        d = {"name": "椅子", "category": "chair", "visibleQuantity": 1,
+        d = {"name": "chair", "category": "chair", "visibleQuantity": 1,
              "visibleText": "", "specSuggestions": [], "uncertainties": []}
         with patch.object(server, "ollama_json", return_value={
                 "message": {"content": json.dumps(d)}, "done_reason": "stop"}):

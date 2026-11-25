@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Create a private group, invite members and share selected resources with your team."
+    />
+    <meta name="theme-color" content="#193e33" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Private groups · Resource Commons</title>
+    <link rel="stylesheet" href="groups.css" />
+  </head>
+  <body>
+    <header class="mast">
+      <a href="index.html" class="brand">Resource Commons</a>
+      <nav aria-label="Main navigation">
+        <a href="index.html#inventory">Inventory</a
+        ><a href="teachers-office.html">Teachers’ office</a
+        ><a href="groups.html" aria-current="page">Groups</a>
+      </nav>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="kicker">Group workspace</p>
+        <h1>Private groups</h1>
+        <p>
+          Keep a shared list of supplies for the people who use them. Only
+          members of a group can see its listings.
+        </p>
+      </section>
+      <p id="status" role="status" aria-live="polite"></p>
+      <section id="profile-entry" class="panel narrow">
+        <h2>Open a member profile</h2>
+        <p>
+          Your name appears next to items you share. A personal access key lets
+          you open the same profile on another device.
+        </p>
+        <form id="profile-form">
+          <label
+            >Display name<input
+              name="member"
+              required
+              maxlength="48"
+              autocomplete="nickname"
+              placeholder="e.g. Ms. Rivera"
+          /></label>
+          <details id="restore">
+            <summary>Use an existing member key</summary>
+            <label
+              >Personal access key<input
+                name="key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                minlength="64"
+                maxlength="64"
+            /></label>
+          </details>
+          <button>Open profile</button>
+        </form>
+      </section>
+      <section id="workspace" hidden>
+        <div class="profile-strip">
+          <span>Signed in as <strong id="display-name"></strong></span>
+          <div>
+            <button id="copy-key" class="quiet">Save member key</button
+            ><button id="sign-out" class="quiet">Sign out</button>
+          </div>
+        </div>
+        <div class="workspace-grid">
+          <aside>
+            <section class="panel">
+              <h2>Your groups</h2>
+              <div id="group-list"></div>
+            </section>
+            <section class="panel">
+              <h2>Create a group</h2>
+              <form id="create-form">
+                <label
+                  >Group name<input
+                    name="name"
+                    required
+                    maxlength="80"
+                    placeholder="e.g. Teachers’ office" /></label
+                ><button>Create group</button>
+              </form>
+            </section>
+            <section class="panel">
+              <h2>Join a group</h2>
+              <form id="join-form">
+                <label
+                  >Invitation code<input
+                    name="code"
+                    required
+                    minlength="64"
+                    maxlength="64"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="Paste the single-use code" /></label
+                ><button>Join group</button>
+              </form>
+            </section>
+          </aside>
+          <div>
+            <section class="panel no-selection" id="empty">
+              <h2>Choose a group</h2>
+              <p>
+                Open a group to see shared items, or join one with a code from
+                its owner.
+              </p>
+            </section>
+            <section id="group-view" hidden>
+              <div class="panel group-head">
+                <span class="kicker">Member-only inventory</span>
+                <h2 id="group-name"></h2>
+                <p id="member-count"></p>
+                <div class="row">
+                  <button id="refresh" class="quiet">Refresh listings</button
+                  ><button id="invite" class="quiet" hidden>
+                    Invite a member
+                  </button>
+                </div>
+                <div id="invite-result" hidden>
+                  <label
+                    >Single-use invitation<input
+                      id="invite-code"
+                      readonly
+                      spellcheck="false"
+                  /></label>
+                  <p>
+                    Send this code privately. It expires in 24 hours. A new code
+                    replaces the previous one.
+                  </p>
+                  <button id="copy-invite" class="quiet">
+                    Copy invitation
+                  </button>
+                </div>
+              </div>
+              <section class="panel">
+                <h2>Shared resources</h2>
+                <div id="listings"></div>
+              </section>
+              <section class="panel">
+                <h2>Share a resource</h2>
+                <form id="share-form">
+                  <label id="inventory-picker" hidden
+                    >Copy from your inventory<select id="local-items">
+                      <option value="">Enter an item manually</option>
+                    </select></label
+                  >
+                  <div class="fields">
+                    <label
+                      >Resource name<input
+                        name="title"
+                        required
+                        maxlength="120"
+                        placeholder="e.g. Whiteboard markers" /></label
+                    ><label
+                      >Quantity<input
+                        name="quantity"
+                        required
+                        type="number"
+                        min="1"
+                        max="9999"
+                        value="1"
+                    /></label>
+                  </div>
+                  <label
+                    >Note <span>(optional)</span
+                    ><textarea
+                      name="note"
+                      maxlength="400"
+                      rows="2"
+                      placeholder="Where to find it or how to request it"
+                    ></textarea></label
+                  ><button>Share with this group</button>
+                </form>
+              </section>
+              <button id="exit-group" class="quiet danger"></button>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+    <dialog id="key-dialog">
+      <h2>Personal access key</h2>
+      <p>
+        Keep this key in your password manager. Anyone holding it can open your
+        profile. To invite someone else, use an invitation code.
+      </p>
+      <input
+        id="member-key"
+        type="password"
+        readonly
+        aria-label="Your member key"
+        autocomplete="off"
+      />
+      <div class="row">
+        <button id="copy-member-key">Copy key</button
+        ><button id="show-key" class="quiet">Show key</button
+        ><button id="close-key" class="quiet">Done</button>
+      </div>
+      <p id="key-status" role="status"></p>
+    </dialog>
+    <script src="engine.js" defer></script>
+    <script src="groups.js" defer></script>
+  </body>
+</html>
