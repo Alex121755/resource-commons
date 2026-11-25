@@ -163,24 +163,43 @@ function normalizeScene(data) {
   return {grouping:{version:1,proposals},detectorAssist:{used:false}};
 }
 
-async function providerJson(response) {
-  if (!response.ok) {
-    if (response.status===429) throw new AiError(429,'The cloud service reached its quota or rate limit. Try again later.');
-    throw unavailable();
+async function providerText(response) {
+  const maxBytes = 256000;
+  if (!response.ok || Number(response.headers.get('Content-Length')) > maxBytes) {
+    if (response.body) await response.body.cancel().catch(() => {});
+    if (!response.ok) {
+      // HTTP status alone is safe to log. Never read a redirect location or an upstream error body.
+      console.warn('Recognition provider HTTP status:', response.status);
+      if (response.status === 429) throw new AiError(429, 'The cloud service reached its quota or rate limit. Try again later.');
+      throw unavailable();
+    }
+    throw invalidOutput();
   }
-  const maxBytes=256000;
-  if (!response.body || Number(response.headers.get('Content-Length'))>maxBytes) throw invalidOutput();
-  const reader=response.body.getReader();
-  const decoder=new TextDecoder('utf-8',{fatal:true});
-  let bytes=0, raw='';
-  while (true) {
-    const {done,value}=await reader.read();
-    if (done) break;
-    bytes+=value.length;
-    if (bytes>maxBytes) { await reader.cancel(); throw invalidOutput(); }
-    raw+=decoder.decode(value,{stream:true});
+  if (!response.body) throw invalidOutput();
+  const reader = response.body.getReader();
+  const chunks = [];
+  let length = 0;
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw invalidOutput();
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return JSON.parse(raw+decoder.decode());
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function outputData(result, secret) {
@@ -198,14 +217,23 @@ export async function handleAiExtraction(kind,body,env,fetchImpl=fetch,beforeCal
   const payload=inputPayload(kind,body);
   const started=Date.now();
   await beforeCall?.();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 85000);
+  let stage = 'dispatch';
   try {
-    const response=await fetchImpl(endpoint,{
-      method:'POST',redirect:'error',signal:AbortSignal.timeout(85000),
+    // Workers accepts "manual" and "follow". Manual returns 3xx to providerText,
+    // which rejects it before the bearer credential can be sent to another origin.
+    const response=await fetchImpl.call(globalThis,endpoint,{
+      method:'POST',redirect:'manual',signal:controller.signal,
       headers:{'Content-Type':'application/json',Authorization:'Bearer '+env.DEEPSEEK_API_KEY},
       body:JSON.stringify(payload)
     });
-    const result=await providerJson(response);
+    stage = 'read';
+    const raw = await providerText(response);
+    stage = 'decode';
+    const result = JSON.parse(raw);
     const data=outputData(result,env.DEEPSEEK_API_KEY);
+    stage = 'validate';
     validate(data,schemas[kind]);
     let extra={};
     if (kind==='request') normalizeRequest(data,body.text);
@@ -225,8 +253,17 @@ export async function handleAiExtraction(kind,body,env,fetchImpl=fetch,beforeCal
     }
     return receipt;
   } catch (err) {
+    // All values are fixed enums or local status codes. No exception message, URL,
+    // model output, request payload, header value, or stack reaches telemetry.
+    const type = err instanceof AiError ? 'invalid_response_or_http_status' :
+      ['TypeError','SyntaxError','TimeoutError','AbortError'].includes(err?.name) ? err.name : 'Error';
+    console.warn('Recognition failure stage and type:', stage, type);
     if (err instanceof AiError) throw err;
-    if (err?.name==='TimeoutError' || err?.name==='AbortError') throw new AiError(504,'The AI request timed out. Try again later.');
+    if (controller.signal.aborted || type === 'TimeoutError' || type === 'AbortError')
+      throw new AiError(504,'The AI request timed out. Try again later.');
+    if (stage === 'decode' || stage === 'validate') throw invalidOutput();
     throw unavailable();
+  } finally {
+    clearTimeout(timeout);
   }
 }

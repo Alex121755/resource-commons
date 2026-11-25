@@ -55,7 +55,13 @@ async function reserveAiCall(db, request) {
     WHERE (SELECT count(*) FROM ai_calls) < 100
       AND (SELECT count(*) FROM ai_calls WHERE day=?) < 30
       AND (SELECT count(*) FROM ai_calls WHERE client=? AND started_at>?) < 6`;
-  const result = await db.prepare(sql).bind(day, now, client, day, client, now-3600000).run();
+  let result;
+  try {
+    result = await db.prepare(sql).bind(day, now, client, day, client, now-3600000).run();
+  } catch {
+    console.error('Recognition quota storage unavailable.');
+    throw new ApiError(503, 'Recognition service unavailable.');
+  }
   if (!result.meta.changes) throw new ApiError(429, 'The shared recognition quota has been reached.');
 }
 
@@ -76,7 +82,7 @@ async function handleAi(request, env, path) {
     if (error instanceof ApiError) throw error;
     // The adapter exposes vetted statuses; never forward an unexpected exception
     // or an upstream diagnostic (which can contain request details).
-    const messages = {400:'Invalid recognition input.',413:'Image is too large.',429:'Recognition is busy.',502:'The provider could not complete recognition.',503:'Recognition service unavailable.',504:'Recognition timed out.'};
+    const messages = {400:'Invalid recognition input.',413:'Image is too large.',422:'Review or change the input.',429:'Recognition is busy.',502:'The provider could not complete recognition.',503:'Recognition service unavailable.',504:'Recognition timed out.'};
     const status = Object.hasOwn(messages, error.status) ? Number(error.status) : 503;
     throw new ApiError(status, messages[status]);
   }

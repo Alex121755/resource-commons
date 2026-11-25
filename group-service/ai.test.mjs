@@ -43,7 +43,7 @@ test('a single request uses the private server credential and the selected UI la
   const result=await handleAiExtraction('request',{text:source,language:'zh-CN'},env,async(url,opts)=>{
     assert.equal(billing,1);calls++;
     assert.equal(url,'https://api.deepseek.com/responses');
-    assert.equal(opts.redirect,'error');
+    assert.equal(opts.redirect,'manual');
     assert.equal(opts.headers.Authorization,'Bearer '+env.DEEPSEEK_API_KEY);
     assert.ok(opts.signal);
     assert.equal(opts.body.includes(env.DEEPSEEK_API_KEY),false);
@@ -140,4 +140,41 @@ test('upstream errors, credentials and raw headers never appear in public errors
       return true;
     });
   }
+});
+
+test('Workers-compatible manual redirects cannot forward credentials or leak redirect destinations', async () => {
+  const env = settings();
+  let calls = 0, cancelled = false;
+  const fetchMock = async (url, init) => {
+    calls++;
+    assert.equal(url, 'https://api.deepseek.com/responses');
+    assert.equal(init.redirect, 'manual');
+    assert.ok(init.signal instanceof AbortSignal);
+    return new Response(new ReadableStream({cancel() {cancelled = true;}}), {
+      status: 307, headers: {Location: 'https://example.invalid/' + env.DEEPSEEK_API_KEY}
+    });
+  };
+  await assert.rejects(() => handleAiExtraction('request', {text: 'chairs'}, env, fetchMock), err => {
+    assert.equal(err.status, 503);
+    assert.equal(String(err).includes(env.DEEPSEEK_API_KEY), false);
+    return true;
+  });
+  assert.equal(calls, 1);
+  assert.equal(cancelled, true);
+});
+
+test('bounded response reader preserves characters across chunks and releases its lock', async () => {
+  const env = settings();
+  const bytes = new TextEncoder().encode(await provider(data).text());
+  const split = bytes.findIndex(b => b >= 0x80) + 1;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes.subarray(0, split));
+      controller.enqueue(bytes.subarray(split));
+      controller.close();
+    }
+  });
+  const result = await handleAiExtraction('request', {text: '两把椅子'}, env, async () => new Response(body));
+  assert.deepEqual(result.data, data);
+  assert.equal(body.locked, false);
 });
